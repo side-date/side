@@ -106,3 +106,11 @@ nav button[data-go="messages"]{position:relative}
 .quickReplies,.rootQuick{display:none!important}
 .chatWelcome .quickReplies{display:none!important}
 .chatAction[data-action="booking"]{display:block!important}
+
+/* SIDE v21 — swipe positions requested: right swipe = delete, left swipe = pin */
+.swipeRow .deleteAction{left:0!important;right:auto!important;background:#8b5f59!important;color:#fff!important}
+.swipeRow .pinAction{right:0!important;left:auto!important;background:#d9cec7!important;color:#4f4541!important}
+/* Normal chat never shows quick-reply chips. Booking CTA is the only in-chat action. */
+.quickReplies,.chatQuickReplies{display:none!important}
+.chatAction{display:none!important}
+.chatAction[data-action="booking"]{display:block!important}

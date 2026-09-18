@@ -63,8 +63,8 @@ function bindSwipeRow(row){
  surface.addEventListener('touchstart',e=>{let t=e.touches[0];sx=t.clientX;sy=t.clientY;dx=0;drag=false;surface.style.transition='none'},{passive:true});
  surface.addEventListener('touchmove',e=>{let t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;if(Math.abs(x)>8&&Math.abs(x)>Math.abs(y)){drag=true;dx=Math.max(-104,Math.min(104,x));surface.style.transform=`translateX(${dx}px)`}},{passive:true});
  surface.addEventListener('touchend',()=>{surface.style.transition='transform .2s ease';suppressClick=drag;
-   if(dx<=-55){surface.style.transform='translateX(-104px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));clearChatState(id);setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else surface.style.transform='translateX(0)'},80)}
-   else if(dx>=55){surface.style.transform='translateX(104px)';setTimeout(()=>{let on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},80)}
+   if(dx<=-55){surface.style.transform='translateX(-104px)';setTimeout(()=>{let on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},80)}
+   else if(dx>=55){surface.style.transform='translateX(104px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));clearChatState(id);setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else surface.style.transform='translateX(0)'},80)}
    else surface.style.transform='translateX(0)';
    setTimeout(()=>suppressClick=false,250);
  });
@@ -73,203 +73,86 @@ function bindSwipeRow(row){
 
 function escapeHTML(v){return String(v).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}
 let chatProfileId=null, typingTimer=null;
-const chatReplies={
+// SIDE v21 — 腳本式聊天事件簿
+// 每個聊天室會保存「話題、已知資訊、事件進度」。一般聊天不顯示快捷鍵；只有預約會出現按鈕。
+const personaVoice={
   wenshu:{
-    hello:['嗯，我在。怎麼了？','看到了。妳慢慢說。','在。今天還好嗎？'],
-    sad:['先別急著說自己沒事。發生什麼？','聽起來妳今天真的撐得有點久。先跟我說最難受的是哪一段。','可以難過，不用現在就把情緒整理好。事情從哪裡開始的？'],
-    angry:['先把最讓妳生氣的那件事講清楚。','我聽得出來妳很火。是對方做了什麼，還是那句話踩到妳了？'],
-    tired:['累就先承認累，不用硬撐。今天是工作，還是別的事把妳耗光了？','先坐好、喝點水。妳如果還想說，我在。'],
-    love:['感情的事先別急著替對方找理由。妳自己怎麼想？','所以妳現在最在意的，是他的態度，還是這段關係接下來怎麼辦？'],
-    affection:['這種話不要隨便對人說。……不過我看到了。','嗯。知道了。妳今天怎麼突然這麼會說？'],
-    food:['先回答我，有沒有吃飯？','可以。想吃什麼？別又跟我說隨便。'],
-    sleep:['睏了就去睡，別拿熬夜當習慣。','晚安。手機放下，剩下的明天再說。'],
-    booking:['可以。妳想先問預約規則，還是直接給我日期？','可以談時間。先說日期。'],
-    question:['妳想知道哪一部分？問清楚一點，我回答妳。','可以問。只是答案不一定是妳想聽的。'],
-    thanks:['不用謝。妳有比較好一點就行。','嗯，收到了。'],
-    sorry:['先別急著道歉。妳做了什麼？','如果真的有做錯，再道歉也不遲。先把事情說清楚。'],
-    laugh:['笑成這樣，看來至少現在心情還行。','嗯？什麼事這麼好笑。'],
-    fallback:['這句我不想亂猜。妳多說一點。','我有在聽。妳是想讓我給意見，還是只想有人陪妳說？','然後呢？把前後一起告訴我。']
+    greet:'嗯，我在。妳說。', unknown:'我怕理解錯。妳把這句再說完整一點。',
+    listen:'好，妳慢慢說。我先聽。', repair:'剛剛那句是我接偏了。妳接著原本的話說，我不亂帶話題。'
   },
   yanyan:{
-    hello:['嗨～我在呀。今天過得怎麼樣？','有看到訊息☺️ 你慢慢說。','我在。是突然想聊天嗎？'],
-    sad:['聽起來真的很不好受。你願意跟我說發生什麼嗎？','不用急著振作，我可以先陪你把這件事說完。','如果現在很亂也沒關係。你先告訴我，最難受的是哪一部分？'],
-    angry:['感覺你是真的被惹到了。是發生什麼事？','先說給我聽吧，我不急著叫你冷靜。'],
-    tired:['今天是不是消耗太多了？如果不想整理得很完整，也可以想到哪裡說到哪裡。','累的話先休息一下也沒關係，我還在。'],
-    love:['感情真的很容易讓人反覆想很多。你現在比較在意他的想法，還是自己的感受？','嗯……那你希望這段關係最後變成什麼樣子？'],
-    affection:['突然這樣說，我會有點不知道怎麼接欸☺️','有收到。今天怎麼突然這麼坦白？'],
-    food:['有吃東西嗎？如果還沒，先找點你喜歡的吃吧。','好呀，你今天想吃什麼？'],
-    sleep:['睏了就先去睡吧，明天還可以繼續聊。晚安。','晚安～今天辛苦了。'],
-    booking:['可以呀。你想先問預約規則，還是直接選日期？','可以，你想約哪一天？'],
-    question:['可以問呀。你想知道什麼？','嗯，我在聽，你問。'],
-    thanks:['不客氣☺️ 有幫上一點忙就好。','不用謝啦。'],
-    sorry:['沒關係，先不用一直道歉。你是因為哪件事覺得過意不去？','我沒有生氣。你慢慢說就好。'],
-    laugh:['哈哈，你這樣我也有點想笑了。','看來這件事真的很好笑😂'],
-    fallback:['我怕我理解錯。你可以再多說一點嗎？','嗯，我有在聽。你比較想要我給意見，還是陪你聊就好？','然後呢？我想聽後面。']
+    greet:'我在呀。你慢慢說。', unknown:'我怕我接錯你的意思。你再多說一點點，好嗎？',
+    listen:'嗯，我有在聽。你繼續。', repair:'剛剛是我理解歪了，抱歉。你接著原本的話說，我會跟著。'
   },
   sichuan:{
-    hello:['幹嘛，我在。','有看到，不用連發🙂 說吧。','在。今天又怎樣？'],
-    sad:['行啦，今天先不嘴你。誰惹你了？','先講發生什麼，不要一句「沒事」就想混過去。','你先說。要罵人我等你講完再幫你罵。'],
-    angry:['喔，聽起來真的欠罵。來，前因後果。','先別氣到漏重點。對方到底幹嘛了？'],
-    tired:['累就去躺一下，你又不是靠意志力充電。','你這個語氣一看就快沒電了。今天到底忙什麼？'],
-    love:['又是感情問題？行，聊天紀錄交出來，我幫你翻譯成人話。','先說你喜歡他哪裡，我再決定要不要吐槽你。'],
-    affection:['少來。……但我看到了。','你今天吃錯藥？突然講這種話🙂'],
-    food:['先去吃飯。餓著腦袋只會更笨。','吃什麼？敢回隨便我就不理你。'],
-    sleep:['去睡。明天黑眼圈不要怪我沒提醒。','晚安。手機丟遠一點，懂？'],
-    booking:['可以約。先講日期。','要約就先給我哪一天。'],
-    question:['問啊。先說好，我不負責講你愛聽的。','什麼問題？'],
-    thanks:['免了。下次少做點蠢事就算謝我。','嗯，知道就好🙂'],
-    sorry:['你先說你幹嘛了，再決定這句對不起值不值錢。','好啦。知道錯哪裡比較重要。'],
-    laugh:['笑屁😂','行，看你笑成這樣應該死不了。'],
-    fallback:['蛤？你把前後講完整，我懶得亂猜。','所以你現在是要我給意見，還是單純聽你靠北？','繼續，我有在看。']
+    greet:'在。幹嘛？', unknown:'你這句前後再補一下，我不亂猜。',
+    listen:'嗯，講。我有在聽。', repair:'……行，剛剛是我接歪了。你繼續，這次我不亂回。'
   }
 };
-const chatIntentRules=[
- ['booking',/預約|想約|約你|有空|哪天|幾點|時間|見面|方案|週末|周末|明天.*空|後天.*空/],
- ['sleep',/晚安|睡覺|想睡|睏|困了|睡不著|失眠/],
- ['food',/吃飯|吃了嗎|吃什麼|餓|早餐|午餐|晚餐|宵夜|餐廳/],
- ['affection',/我想你|想你了|喜歡你|愛你|抱抱|親親|想見你|想抱/],
- ['love',/失戀|分手|前任|男友|女友|曖昧|劈腿|感情|交往|告白|冷淡|已讀不回/],
- ['angry',/生氣|氣死|很氣|煩死|討厭|不爽|火大|過分/],
- ['sad',/難過|想哭|哭了|不開心|痛苦|委屈|心情不好|低落|崩潰|撐不住/],
- ['tired',/好累|很累|累死|疲憊|沒力|上班|工作|主管|加班|壓力/],
- ['thanks',/謝謝|感謝|謝啦|thank/i],
- ['sorry',/對不起|抱歉|sorry/i],
- ['hello',/^(嗨|哈囉|哈囉+|hello|hi|在嗎|你好|早安|午安)[!！?？~～。 ]*$/i],
- ['laugh',/哈哈|笑死|笑爛|😂|🤣|www/i],
- ['question',/[?？]$|為什麼|怎麼|什麼|哪個|是不是|可以嗎|你覺得|你會|你有沒有/]
-];
-function detectChatIntent(text){
-  const t=String(text).trim();
-  for(const [intent,re] of chatIntentRules) if(re.test(t)) return intent;
-  return 'fallback';
-}
-function pickReply(pool,history){
-  const used=new Set(history.filter(m=>m.from==='them').slice(-12).map(m=>m.text));
-  const fresh=pool.filter(x=>!used.has(x));
-  const choices=fresh.length?fresh:pool;
-  return choices[Math.floor(Math.random()*choices.length)];
-}
-function recentUser(history){return [...history].reverse().find(m=>m.from==='me')}
-function recentBot(history){return [...history].reverse().find(m=>m.from==='them')}
 function stateKey(id){return `side-chat-state-${id}`}
 function getChatState(id){try{return JSON.parse(localStorage.getItem(stateKey(id))||'{}')}catch(e){return {}}}
 function saveChatState(id,s){localStorage.setItem(stateKey(id),JSON.stringify(s))}
 function clearChatState(id){localStorage.removeItem(stateKey(id))}
-const personaLine={
- wenshu:{
-  mood:'嗯，我在。現在不用急著把原因講清楚。妳比較需要哪一種？',
-  listen:'好。妳說，我先聽，不分析。',
-  advice:'可以。妳把事情講給我聽，我聽完再給妳想法。',
-  distract:'好，那先不碰讓妳不舒服的事。我們換個話題。',
-  food:'先別餓著。妳想自己選，還是要我幫妳挑？',
-  idle:'可以。妳想聊天，還是想找點事情做？',
-  sleep:'睡不著？是腦子停不下來，還是單純沒有睡意？',
-  love:'感情的事可以說。妳現在比較想被聽著，還是想聽我的看法？',
-  work:'工作讓妳煩？先說最卡的那一件就好。',
-  hello:'嗯，我在。今天想聊什麼？',
-  unknown:'這句我怕理解錯。妳可以再講直接一點，我不想亂猜。'
- },
- yanyan:{
-  mood:'我在。現在不用逼自己整理好情緒。你比較需要哪一種？',
-  listen:'好，我先聽。你慢慢說就好。',
-  advice:'可以呀。你先把事情告訴我，我聽完再陪你一起想。',
-  distract:'好～那我們先換個話題，不一直困在不開心裡。',
-  food:'先不要餓著啦。你想自己選，還是要我陪你挑？',
-  idle:'那我陪你。想聊天，還是找點事情做？',
-  sleep:'睡不著嗎？是有事情一直在想，還是單純不睏？',
-  love:'可以說呀。你想先讓我聽，還是想聽我的想法？',
-  work:'工作很累嗎？你先說今天最煩的是哪一件。',
-  hello:'在呀～今天想聊什麼？',
-  unknown:'我怕我理解錯。你可以再說直接一點，我不想亂猜。'
- },
- sichuan:{
-  mood:'……行，今天先不嘴你。你要哪種？',
-  listen:'行，我聽。你講。',
-  advice:'可以。先把事情講完整，我聽完再嘴……不是，再給意見。',
-  distract:'行，不聊那個。換一個，省得你越想越煩。',
-  food:'餓就先處理。你自己選，還是我幫你挑？',
-  idle:'無聊？那你要聊天還是找事做。',
-  sleep:'睡不著？腦子太吵，還是根本不睏？',
-  love:'感情喔。你要我聽，還是要我講難聽但有用的？',
-  work:'工作又怎樣了？挑最煩的那件講。',
-  hello:'在。幹嘛？',
-  unknown:'這句我不亂猜。講直接點，我不亂猜。'
+function patchState(id,patch){const s=getChatState(id);Object.assign(s,patch);saveChatState(id,s);return s}
+function remember(id,key,value){const s=getChatState(id);s.memory=s.memory||{};s.memory[key]=value;s.lastTopic=key;saveChatState(id,s)}
+function has(t,re){return re.test(String(t).trim())}
+function dateText(t){const m=String(t).match(/(?:我要預約|想約|預約)?\s*((?:\d{1,2}[\/月]\d{1,2}(?:日)?)|(?:今天|明天|後天|下週[^，。 ]*|下星期[^，。 ]*))/);return m?m[1]:''}
+function eventReply(id,text){
+ const t=String(text).trim(), v=personaVoice[id], s=getChatState(id), mem=s.memory||{};
+ // 0. 預約是唯一功能 CTA，不在聊天室裡用文字猜完整流程。
+ if(has(t,/預約|我要約|想約你|約見面|可以約嗎|想見面/)){
+   const d=dateText(t); if(d) remember(id,'bookingDate',d);
+   return {text:id==='sichuan'?(d?`${d}？行。日期跟時段去預約頁選，免得我跟你對半天。`:'可以。直接去預約頁選日期跟時段。'):id==='wenshu'?(d?`${d}，我看到了。正式日期和時段直接到預約頁確認，會比較準。`:'可以。日期和時段直接到預約頁確認，這樣不會弄錯。'):(d?`${d}，好呀～正式日期和時段到預約頁選就可以了。`:'可以呀～直接到預約頁選日期和時段吧。'),action:'booking',label:'前往預約'};
  }
-};
-function quickFor(topic){
- const q={
-  root:[['聊聊心情','mood'],['我好餓','food'],['好無聊','idle'],['睡不著','sleep'],['感情問題','love'],['工作好累','work'],['我要預約','booking']],
-  mood:[['聽我說','listen'],['給我意見','advice'],['轉移注意力','distract'],['先陪我一下','stay']],
-  food:[['幫我挑','foodPick'],['我自己選','foodSelf'],['算了不吃','foodNo']],
-  idle:[['陪我聊天','idleChat'],['找事情做','idleDo'],['隨便聊聊','idleRandom']],
-  sleep:[['腦袋停不下來','sleepThink'],['單純不睏','sleepAwake'],['陪我聊一下','idleChat']],
-  love:[['先聽我說','listen'],['給我看法','advice'],['不想講細節','distract']],
-  work:[['我想抱怨','listen'],['幫我想辦法','advice'],['先不聊工作','distract']]
- };return q[topic]||q.root;
+ // 1. 對「亂回／沒在聽」的修復事件優先。
+ if(has(t,/你(根本)?沒在聽|亂回|亂講|答非所問|已讀亂回|很敷衍|回覆.*爛|你在講什麼|接錯|理解錯|態度.*(差|糟)/)){
+   patchState(id,{event:'repair',step:1}); return {text:v.repair};
+ }
+ // 2. 延續已建立事件：不重新從零分類。
+ if(s.event==='mood'){
+   if(has(t,/下雨|雨天|雨/)){remember(id,'moodCause','下雨');patchState(id,{step:2});return {text:id==='sichuan'?'喔，原來是下雨。你是討厭出門麻煩，還是雨天本身就會讓你悶？':id==='wenshu'?'原來是下雨。是出門變得麻煩，還是雨天本身就會讓妳心情往下掉？':'原來是下雨呀。是因為出門很麻煩，還是雨天本身就會讓你心情比較悶？'};}
+   if(has(t,/不知道|沒原因|就這樣|莫名/)){patchState(id,{step:(s.step||1)+1});return {text:id==='sichuan'?'不知道就先不知道。心情差又不一定非得有報告。你要我陪你聊別的，還是就待著？':id==='wenshu'?'不知道也沒關係，不需要現在硬找原因。妳想繼續說，還是先聊點別的？':'不知道也沒關係呀，不用逼自己現在找答案。要不要先聊點別的？'};}
+   if(has(t,/不想講|不想說|算了/)){patchState(id,{event:'idle',step:1});return {text:id==='sichuan'?'行，不逼你。那換個東西聊。':id==='wenshu'?'好，那就先不講。換個輕鬆一點的。':'好，那先不講也沒關係。我們換個輕鬆的。'};}
+   if(has(t,/你呢|你今天|有趣|發生什麼/)) return {text:id==='sichuan'?'我？今天沒什麼大事。倒是剛剛看到有人把咖啡灑在自己鞋上，還裝沒事走掉。夠不夠無聊？':id==='wenshu'?'我今天很普通。處理了一些事，路上買了杯咖啡。沒有什麼戲劇性的，反而挺好。':'我今天還滿普通的～不過路上看到一隻狗一直盯著飲料店門口，主人拉都拉不走，有點可愛。'};
+   if(t.length>1){patchState(id,{step:(s.step||1)+1});return {text:id==='sichuan'?'嗯，我有跟上。然後呢？':id==='wenshu'?'嗯，我有跟上。然後呢？':'嗯，我有在聽。後來呢？'};}
+ }
+ if(s.event==='food'){
+   if(has(t,/沒有|還沒|沒吃/)) return {text:id==='sichuan'?'那你還在這裡耗。想吃飯、麵，還是炸的？':id==='wenshu'?'那先別一直空腹。妳現在比較想吃飯、麵，還是炸的？':'那先吃點東西吧～飯、麵、還是炸的，你比較想哪個？'};
+   if(has(t,/薯條|炸物|雞排|鹽酥雞/)){remember(id,'food','炸物');return {text:id==='sichuan'?'可以啊。只是你真餓的話，薯條八成撐不了多久。要不要再配個漢堡或雞肉？':id==='wenshu'?'可以。如果是真的餓，只有薯條可能不太夠；可以再配一份有蛋白質的東西。':'可以呀～但真的很餓的話，薯條可能不太夠，要不要再配個漢堡或雞肉？'};}
+   if(has(t,/建議|推薦|你覺得|吃什麼/)) return {text:id==='sichuan'?'懶得選就吃熱的。牛肉麵、咖哩飯、鍋，挑一個。':id==='wenshu'?'如果妳現在又餓又懶得選，我會選一份熱的正餐。牛肉麵、咖哩飯或小火鍋都可以。':'如果現在很餓，我會選熱的正餐～牛肉麵、咖哩飯或小火鍋，你比較想哪個？'};
+ }
+ if(s.event==='idle'){
+   if(has(t,/跟你聊|聊天/)) return {text:id==='sichuan'?'行啊。那我問，你最近有沒有一件明明很小、但一直記著的事？':id==='wenshu'?'可以。那我問妳一個簡單的：最近有沒有一件很小、但會讓妳心情變好的事？':'好呀～那我問你：最近有沒有一件很小、但想到會開心的事？'};
+   if(has(t,/不知道|隨便/)) return {text:id==='sichuan'?'那我開題。最近最想買但一直沒下手的是什麼？':id==='wenshu'?'那我開一個輕鬆的。最近有沒有一直想買、但還沒下手的東西？':'那我來開題～最近有沒有一直想買、但還沒買的東西？'};
+ }
+ if(s.event==='love'){
+   if(has(t,/他|她|對方|前任|男友|女友|曖昧/)&&t.length>3){patchState(id,{step:(s.step||1)+1});return {text:id==='sichuan'?'嗯，這段我聽懂了。你最不爽的是他做的事，還是他那個態度？':id==='wenshu'?'我大概明白了。妳現在最介意的是他做的那件事，還是他處理妳感受的方式？':'我懂你的意思了。你現在最難受的是那件事本身，還是對方的態度？'};}
+ }
+ if(s.event==='work'){
+   if(has(t,/主管|老闆|同事/)){remember(id,'workCause',t);return {text:id==='sichuan'?'又是人比工作本身煩，是吧。具體幹嘛了？':id==='wenshu'?'聽起來真正耗妳的可能不是工作量，是人。對方做了什麼？':'聽起來累你的不只是工作，是人。對方做了什麼呀？'};}
+ }
+ if(s.event==='sleep'){
+   if(has(t,/想很多|腦袋|停不下來|一直想/)) return {text:id==='sichuan'?'那別硬睡。腦子裡最吵的那件事先丟給我。':id==='wenshu'?'那先別逼自己睡。腦子裡現在最放不下的那件事，可以先說給我聽。':'那先不要逼自己睡。腦袋裡最吵的那件事先跟我說，好嗎？'};
+ }
+ // 3. 開啟新事件。這些事件會寫進事件簿 state，後續句子沿用同一脈絡。
+ if(has(t,/心情不好|不開心|難過|想哭|委屈|低落|很煩|今天不好/)){patchState(id,{event:'mood',step:1});return {text:id==='sichuan'?'……行，今天先不嘴你。怎麼了？':id==='wenshu'?'好，我在。今天發生什麼了？':'我在。今天怎麼了？'};}
+ if(has(t,/好餓|很餓|餓死|肚子餓|吃飯|吃什麼|沒吃|還沒吃/)){patchState(id,{event:'food',step:1});return {text:id==='sichuan'?'餓就先處理。你今天吃過什麼了？':id==='wenshu'?'先別一直餓著。妳今天有吃東西嗎？':'先不要餓著啦。你今天有吃東西嗎？'};}
+ if(has(t,/無聊|好無聊/)){patchState(id,{event:'idle',step:1});return {text:id==='sichuan'?'無聊？那聊啊。你想自己開題，還是我開？':id==='wenshu'?'可以陪妳聊。妳想自己開話題，還是我來？':'那我陪你聊呀～你想自己開話題，還是我來？'};}
+ if(has(t,/睡不著|失眠|不睏|不困/)){patchState(id,{event:'sleep',step:1});return {text:id==='sichuan'?'睡不著？是腦子太吵，還是根本不睏？':id==='wenshu'?'睡不著？是腦子停不下來，還是單純沒有睡意？':'睡不著嗎？是一直在想事情，還是單純不睏？'};}
+ if(has(t,/失戀|分手|前任|感情|曖昧|男友|女友|喜歡的人/)){patchState(id,{event:'love',step:1});return {text:id==='sichuan'?'感情喔。行，先講發生什麼，我再決定要不要罵你。':id==='wenshu'?'感情的事可以說。先告訴我發生什麼。':'可以說呀。先告訴我發生什麼了。'};}
+ if(has(t,/工作|上班|加班|主管|老闆|同事|好累|很累/)){patchState(id,{event:'work',step:1});return {text:id==='sichuan'?'工作又怎樣了？挑最煩的那件講。':id==='wenshu'?'工作把妳耗到了？先說今天最煩的那一件。':'工作很累嗎？先跟我說今天最煩的那件事。'};}
+ if(has(t,/^(嗨|哈囉|hi|hello|在嗎|你好|欸|喂)[!！?？。 ]*$/i)){patchState(id,{event:'hello',step:1});return {text:v.greet};}
+ // 4. 短句承接：利用上一則機器人訊息與事件，不把「對／沒有／不知道」當新話題。
+ if(has(t,/^(對|嗯|恩|是|沒錯|真的)[。！! ]*$/)) return {text:s.event?v.listen:'嗯，我在聽。'};
+ if(has(t,/^(沒有|沒|不是)[。！! ]*$/)) return {text:id==='sichuan'?'行，那不是。你接著說。':id==='wenshu'?'好，那不是。妳接著說。':'好，那不是。你接著說。'};
+ if(has(t,/^(不知道|不確定)[。！! ]*$/)) return {text:id==='sichuan'?'不知道就先不知道。你不用硬湊答案。':id==='wenshu'?'不知道也沒關係，不用現在硬找答案。':'不知道也沒關係，不用逼自己現在回答。'};
+ // 5. 普通問句與一般句，盡量針對字面回，不用固定「要意見還是傾聽」。
+ if(has(t,/你(今天)?有(發生)?什麼|你今天怎樣|今天有趣/)) return {text:id==='sichuan'?'沒什麼大事。今天最大的娛樂大概是看人走路差點撞玻璃門。':id==='wenshu'?'今天很普通。處理工作、喝了杯咖啡，沒有什麼特別的。':'今天滿普通的～不過路上看到一隻很可愛的狗，算是小插曲。'};
+ if(has(t,/你覺得|給我.*建議|怎麼辦/)) return {text:s.event?v.listen:(id==='sichuan'?'可以，但你先把事情講完整。':id==='wenshu'?'可以。妳先把事情講完整，我再給妳看法。':'可以呀。你先把事情說完整，我再陪你想。')};
+ if(t.length>=8 && s.event) return {text:v.listen};
+ return {text:v.unknown};
 }
-function replyFor(id,text){
- const t=String(text).trim(),p=personaLine[id],st=getChatState(id);
- // 功能型意圖永遠最高優先：聊天室不再自行猜日期/時間。
- if(/預約|想約|約你|可以約|有空嗎|哪天有空/.test(t)){
-   clearChatState(id);
-   return {text:id==='sichuan'?'可以。直接去預約頁選日期。':id==='wenshu'?'可以。日期和時間直接從預約頁選，這樣不會弄錯。':'可以呀～直接從預約頁選日期和時間吧。',action:'booking',label:'前往預約'};
- }
- // 已進入某個主題時，先依「目前話題」理解新句子，不重新從零分類。
- if(st.topic==='food'){
-   if(/建議|你覺得|吃什麼|幫我(挑|選)|推薦/.test(t)) return quickReplyFor(id,'foodPick');
-   if(/薯條|炸物|炸的|雞排|鹽酥雞/.test(t)) return {text:id==='sichuan'?'薯條可以，但你要是很餓，最好再補點真的能頂肚子的。':id==='wenshu'?'薯條可以。如果妳是真的餓，我會建議再配一點比較能當正餐的東西。':'薯條可以呀～但如果真的很餓，我會再配一點正餐。'};
-   if(/^(沒有|沒|還沒|沒吃)[啊呀。！! ]*$/.test(t)) return {text:id==='sichuan'?'難怪。那你現在想吃什麼？':id==='wenshu'?'難怪會餓。妳現在比較想吃什麼？':'難怪會餓呀。那你現在想吃什麼？'};
-   if(/不想吃|不吃|沒胃口/.test(t)) return quickReplyFor(id,'foodNo');
- }
- if(st.topic==='mood'||st.topic==='love'||st.topic==='work'){
-   if(/不想講|換話題|別聊|轉移/.test(t)){clearChatState(id);return {text:id==='sichuan'?'行，不聊這個。你想換什麼？':id==='wenshu'?'好，那先不聊這個。妳想換成什麼？':'好～那先換個話題。你想聊什麼？'};}
-   if(/意見|建議|你覺得|怎麼辦|怎麼做/.test(t)) return {text:id==='sichuan'?'可以。先把你最在意的那一點講清楚，我再給你意見。':id==='wenshu'?'可以。妳先告訴我現在最在意的是哪一點，我再給妳比較實際的想法。':'可以呀。你先告訴我現在最在意的是哪一點，我再陪你一起想。'};
-   if(/下雨|雨天|雨/.test(t)) return {text:id==='sichuan'?'原來是下雨。你是不喜歡濕答答的，還是雨天本身就讓你煩？':id==='wenshu'?'原來是下雨讓妳悶。妳是不喜歡濕答答的感覺，還是雨天本身就容易讓妳心情變差？':'原來是下雨讓你不開心。你是不喜歡濕答答的感覺，還是雨天本身就會讓你比較悶？'};
-   if(/聽我|我想說|讓我說|抱怨/.test(t)) return {text:id==='sichuan'?'行，我聽。你講。':id==='wenshu'?'好，妳說。我先聽，不急著分析。':'好，我聽。你慢慢說。'};
-   if(t.length>=3) return {text:id==='sichuan'?'嗯，我有在聽。你接著講，別急著整理成結論。':id==='wenshu'?'嗯，我有跟上。妳接著說，不用急著把它講得很完整。':'嗯，我有在聽。你接著說就好，不用急著整理。'};
- }
- if(st.topic==='idle' && /建議|做什麼|幹嘛|不知道/.test(t)) return quickReplyFor(id,'idleDo');
- if(st.topic==='sleep' && /想很多|停不下來|腦袋|一直想/.test(t)) return quickReplyFor(id,'sleepThink');
- // 開啟新主題。
- if(/心情不好|今天不好|不開心|難過|想哭|委屈|低落|很煩/.test(t)){saveChatState(id,{topic:'mood'});return {text:p.mood};}
- if(/好餓|很餓|餓死|肚子餓|沒吃飯|還沒吃/.test(t)){saveChatState(id,{topic:'food'});return {text:p.food};}
- if(/無聊|好無聊/.test(t)){saveChatState(id,{topic:'idle'});return {text:p.idle};}
- if(/睡不著|失眠|不睏|不困/.test(t)){saveChatState(id,{topic:'sleep'});return {text:p.sleep};}
- if(/失戀|分手|前任|感情|曖昧|男友|女友/.test(t)){saveChatState(id,{topic:'love'});return {text:p.love};}
- if(/工作|上班|加班|主管|老闆|同事|好累|很累/.test(t)){saveChatState(id,{topic:'work'});return {text:p.work};}
- if(/^(嗨|哈囉|hi|hello|在嗎|你好)[!！?？。 ]*$/i.test(t)){clearChatState(id);return {text:p.hello};}
- return {text:p.unknown};
-}
-function quickReplyFor(id,key){
- const p=personaLine[id];
- const map={
-  mood:()=>({text:p.mood}),
-  listen:()=>({text:p.listen}),
-  advice:()=>({text:p.advice}),
-  distract:()=>({text:p.distract}),
-  stay:()=>({text:id==='sichuan'?'行。先待著，不逼你講。':id==='wenshu'?'好。那就先待著，不用說什麼。':'好呀，我先陪你待一下。'}),
-  food:()=>({text:p.food}),
-  foodPick:()=>({text:id==='sichuan'?'飯、麵、炸的。三個選一個。':id==='wenshu'?'那我幫妳縮小範圍：飯、麵，還是想吃炸的？':'那我幫你選～飯、麵、還是炸的？'}),
-  foodSelf:()=>({text:id==='sichuan'?'行，選好了記得真的去吃。':id==='wenshu'?'好，選好就去吃，別一直餓著。':'好～選好記得真的去吃喔。'}),
-  foodNo:()=>({text:id==='sichuan'?'不吃也行，等等餓到脾氣差別怪我。':id==='wenshu'?'不太想吃也至少喝點東西，別一直空腹。':'不想吃的話至少喝點東西，好嗎？'}),
-  foodRice:()=>({text:id==='sichuan'?'那就吃飯。別再選半天。':id==='wenshu'?'那就吃飯。想清淡一點還是重口味？':'那吃飯～想清淡的還是重口味？'}),
-  foodNoodle:()=>({text:id==='sichuan'?'麵。可以，去找一家近的。':id==='wenshu'?'那就麵。湯麵或乾麵，看妳現在比較想吃哪種。':'麵可以呀～湯的還是乾的？'}),
-  foodFried:()=>({text:id==='sichuan'?'我就知道。去吃，至少再配個飲料。':id==='wenshu'?'可以，但別只拿一小份薯條當正餐。':'可以～但不要只吃一點點就算一餐喔。'}),
-  idle:()=>({text:p.idle}),
-  idleChat:()=>({text:id==='sichuan'?'行。你最近有什麼事一直掛在腦子裡？':id==='wenshu'?'好。最近有沒有哪件事一直放在心上？':'好呀～最近有什麼事情一直在你腦袋裡？'}),
-  idleDo:()=>({text:id==='sichuan'?'去洗澡、找東西吃、看一集劇。挑一個。':id==='wenshu'?'可以找件不用動太多腦的事：洗澡、散步，或看一集喜歡的東西。':'那找個輕鬆的～散步、洗澡、看一集劇，選一個？'}),
-  idleRandom:()=>({text:id==='sichuan'?'那我問。最近最想買但一直沒買的是什麼？':id==='wenshu'?'那隨便聊。最近有沒有什麼東西，是妳一直想買卻還沒下手的？':'那我隨便問一題～最近有沒有一直想買但還沒買的東西？'}),
-  sleep:()=>({text:p.sleep}),
-  sleepThink:()=>({text:id==='sichuan'?'那就別逼自己睡。腦子裡最吵的那件事是什麼？':id==='wenshu'?'那先別逼自己立刻睡。腦子裡現在最放不下的是哪件事？':'那先不要逼自己睡。現在腦袋裡一直轉的是什麼？'}),
-  sleepAwake:()=>({text:id==='sichuan'?'那就晚點睡。別躺著硬耗。':id==='wenshu'?'那就先起來做點安靜的事，等真的有睡意再躺。':'那先不要硬睡～做點安靜的事，睏了再回床上。'}),
-  love:()=>({text:p.love}),
-  work:()=>({text:p.work}),
-  booking:()=>({text:id==='sichuan'?'行，直接選日期。':id==='wenshu'?'可以，直接看看可預約日期。':'可以呀，直接選日期吧～',action:'booking',label:'查看可預約日期'}),
-  continue:()=>({text:id==='sichuan'?'嗯，講。':id==='wenshu'?'好，妳繼續。':'嗯嗯，你繼續。'}),
-  done:()=>({text:id==='sichuan'?'行。那先到這。':id==='wenshu'?'好。說完就先休息一下。':'好～那先讓自己休息一下。'})
- };
- return (map[key]||(()=>({text:p.unknown})))();
-}
+function replyFor(id,text){return eventReply(id,text)}
 
 function chatKey(id){return 'side-chat-'+id}
 function getChat(id){return JSON.parse(localStorage.getItem(chatKey(id))||'[]')}
