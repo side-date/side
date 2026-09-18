@@ -59,17 +59,110 @@ function renderConversations(){
 function escapeHTML(v){return String(v).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}
 let chatProfileId=null, typingTimer=null;
 const chatReplies={
-  wenshu:{hello:['嗯，我在。','看到了。妳慢慢說。','在，怎麼了？'],busy:['如果是要約時間，妳先告訴我哪一天。','行程我可以幫妳看，但先別急。'],sad:['先把事情說完，我聽。','不用急著整理好情緒再來找我。','今天很難受？先跟我說發生什麼事。'],food:['有吃飯嗎？先回答這個。','可以。想吃什麼？'],default:['嗯，我有在聽。','然後呢？','可以，妳繼續說。','我知道了。先不用急著下結論。']},
-  yanyan:{hello:['嗨～我在這裡。','有看到訊息☺️ 今天過得還好嗎？','我在呀，慢慢說就好。'],busy:['如果你有想約的日期，可以先跟我說，我幫你一起看看。','可以呀，你比較希望白天還是晚上？'],sad:['沒關係，你可以慢慢說，我會看完。','聽起來今天真的有點累。想從哪裡開始說？','不用勉強自己現在就振作。'],food:['好呀，你今天想吃什麼？','先去吃點東西也可以，我陪你聊。'],default:['原來是這樣。','我有在聽，你繼續說☺️','嗯嗯，然後呢？','這件事你是不是想很久了？']},
-  sichuan:{hello:['幹嘛。','有看到，不用連發🙂','我在，說吧。'],busy:['要約就直接講日期，不要跟我玩猜謎。','先說哪天，我再看。'],sad:['先講發生什麼事，我再決定要不要罵醒你。','行啦，今天先不嘴你。說吧。','誰又惹你了？'],food:['先去吃飯。餓著腦袋只會更笨。','吃什麼？不要跟我說隨便。'],default:['所以？你繼續。','嗯，這次有在聽。','你這句我先保留意見🙂','行，然後咧？']}
+  wenshu:{
+    hello:['嗯，我在。怎麼了？','看到了。妳慢慢說。','在。今天還好嗎？'],
+    sad:['先別急著說自己沒事。發生什麼？','聽起來妳今天真的撐得有點久。先跟我說最難受的是哪一段。','可以難過，不用現在就把情緒整理好。事情從哪裡開始的？'],
+    angry:['先把最讓妳生氣的那件事講清楚。','我聽得出來妳很火。是對方做了什麼，還是那句話踩到妳了？'],
+    tired:['累就先承認累，不用硬撐。今天是工作，還是別的事把妳耗光了？','先坐好、喝點水。妳如果還想說，我在。'],
+    love:['感情的事先別急著替對方找理由。妳自己怎麼想？','所以妳現在最在意的，是他的態度，還是這段關係接下來怎麼辦？'],
+    affection:['這種話不要隨便對人說。……不過我看到了。','嗯。知道了。妳今天怎麼突然這麼會說？'],
+    food:['先回答我，有沒有吃飯？','可以。想吃什麼？別又跟我說隨便。'],
+    sleep:['睏了就去睡，別拿熬夜當習慣。','晚安。手機放下，剩下的明天再說。'],
+    booking:['要約哪一天？妳先給我日期，我再看。','可以談時間。先說日期和大概想做什麼。'],
+    question:['妳想知道哪一部分？問清楚一點，我回答妳。','可以問。只是答案不一定是妳想聽的。'],
+    thanks:['不用謝。妳有比較好一點就行。','嗯，收到了。'],
+    sorry:['先別急著道歉。妳做了什麼？','如果真的有做錯，再道歉也不遲。先把事情說清楚。'],
+    laugh:['笑成這樣，看來至少現在心情還行。','嗯？什麼事這麼好笑。'],
+    fallback:['這句我不想亂猜。妳多說一點。','我有在聽。妳是想讓我給意見，還是只想有人陪妳說？','然後呢？把前後一起告訴我。']
+  },
+  yanyan:{
+    hello:['嗨～我在呀。今天過得怎麼樣？','有看到訊息☺️ 你慢慢說。','我在。是突然想聊天嗎？'],
+    sad:['聽起來真的很不好受。你願意跟我說發生什麼嗎？','不用急著振作，我可以先陪你把這件事說完。','如果現在很亂也沒關係。你先告訴我，最難受的是哪一部分？'],
+    angry:['感覺你是真的被惹到了。是發生什麼事？','先說給我聽吧，我不急著叫你冷靜。'],
+    tired:['今天是不是消耗太多了？如果不想整理得很完整，也可以想到哪裡說到哪裡。','累的話先休息一下也沒關係，我還在。'],
+    love:['感情真的很容易讓人反覆想很多。你現在比較在意他的想法，還是自己的感受？','嗯……那你希望這段關係最後變成什麼樣子？'],
+    affection:['突然這樣說，我會有點不知道怎麼接欸☺️','有收到。今天怎麼突然這麼坦白？'],
+    food:['有吃東西嗎？如果還沒，先找點你喜歡的吃吧。','好呀，你今天想吃什麼？'],
+    sleep:['睏了就先去睡吧，明天還可以繼續聊。晚安。','晚安～今天辛苦了。'],
+    booking:['可以呀，你有想約哪一天嗎？','你先告訴我日期，我們再看看白天還是晚上比較適合。'],
+    question:['可以問呀。你想知道什麼？','嗯，我在聽，你問。'],
+    thanks:['不客氣☺️ 有幫上一點忙就好。','不用謝啦。'],
+    sorry:['沒關係，先不用一直道歉。你是因為哪件事覺得過意不去？','我沒有生氣。你慢慢說就好。'],
+    laugh:['哈哈，你這樣我也有點想笑了。','看來這件事真的很好笑😂'],
+    fallback:['我怕我理解錯。你可以再多說一點嗎？','嗯，我有在聽。你比較想要我給意見，還是陪你聊就好？','然後呢？我想聽後面。']
+  },
+  sichuan:{
+    hello:['幹嘛，我在。','有看到，不用連發🙂 說吧。','在。今天又怎樣？'],
+    sad:['行啦，今天先不嘴你。誰惹你了？','先講發生什麼，不要一句「沒事」就想混過去。','你先說。要罵人我等你講完再幫你罵。'],
+    angry:['喔，聽起來真的欠罵。來，前因後果。','先別氣到漏重點。對方到底幹嘛了？'],
+    tired:['累就去躺一下，你又不是靠意志力充電。','你這個語氣一看就快沒電了。今天到底忙什麼？'],
+    love:['又是感情問題？行，聊天紀錄交出來，我幫你翻譯成人話。','先說你喜歡他哪裡，我再決定要不要吐槽你。'],
+    affection:['少來。……但我看到了。','你今天吃錯藥？突然講這種話🙂'],
+    food:['先去吃飯。餓著腦袋只會更笨。','吃什麼？敢回隨便我就不理你。'],
+    sleep:['去睡。明天黑眼圈不要怪我沒提醒。','晚安。手機丟遠一點，懂？'],
+    booking:['要約就講日期，不要叫我猜。','哪天？時間？一次講完。'],
+    question:['問啊。先說好，我不負責講你愛聽的。','什麼問題？'],
+    thanks:['免了。下次少做點蠢事就算謝我。','嗯，知道就好🙂'],
+    sorry:['你先說你幹嘛了，再決定這句對不起值不值錢。','好啦。知道錯哪裡比較重要。'],
+    laugh:['笑屁😂','行，看你笑成這樣應該死不了。'],
+    fallback:['蛤？你把前後講完整，我懶得亂猜。','所以你現在是要我給意見，還是單純聽你靠北？','繼續，我有在看。']
+  }
 };
+const chatIntentRules=[
+ ['booking',/預約|想約|約你|有空|哪天|幾點|時間|見面|方案|週末|周末|明天.*空|後天.*空/],
+ ['sleep',/晚安|睡覺|想睡|睏|困了|睡不著|失眠/],
+ ['food',/吃飯|吃了嗎|吃什麼|餓|早餐|午餐|晚餐|宵夜|餐廳/],
+ ['affection',/我想你|想你了|喜歡你|愛你|抱抱|親親|想見你|想抱/],
+ ['love',/失戀|分手|前任|男友|女友|曖昧|劈腿|喜歡他|喜歡她|感情|交往|告白|冷淡|已讀不回/],
+ ['angry',/生氣|氣死|很氣|靠北|幹|煩死|討厭|不爽|火大|過分/],
+ ['sad',/難過|想哭|哭了|不開心|痛苦|委屈|心情不好|低落|崩潰|撐不住|沒事啦|沒事了/],
+ ['tired',/好累|很累|累死|疲憊|沒力|上班|工作|主管|加班|壓力/],
+ ['thanks',/謝謝|感謝|謝啦|thank/],
+ ['sorry',/對不起|抱歉|sorry/],
+ ['hello',/^(嗨|哈囉|哈囉+|hello|hi|在嗎|你好|早安|午安)[!！?？~～。 ]*$/i],
+ ['laugh',/哈哈|笑死|笑爛|😂|🤣|www/],
+ ['question',/[?？]$|為什麼|怎麼|什麼|哪個|是不是|可以嗎|你覺得|你會|你有沒有/]
+];
+function detectChatIntent(text,history){
+  const t=String(text).trim();
+  for(const [intent,re] of chatIntentRules) if(re.test(t)) return intent;
+  // Very short follow-ups inherit the recent topic instead of jumping to a random canned reply.
+  if(t.length<=12){
+    const recent=[...history].reverse().filter(m=>m.from==='me').slice(0,3);
+    for(const m of recent){
+      for(const [intent,re] of chatIntentRules){
+        if(!['hello','laugh','question'].includes(intent)&&re.test(m.text||'')) return intent;
+      }
+    }
+  }
+  return 'fallback';
+}
+function pickReply(pool,history){
+  const used=new Set(history.filter(m=>m.from==='them').slice(-6).map(m=>m.text));
+  const fresh=pool.filter(x=>!used.has(x));
+  const choices=fresh.length?fresh:pool;
+  return choices[Math.floor(Math.random()*choices.length)];
+}
+function replyFor(id,text){
+  const history=getChat(id), r=chatReplies[id], intent=detectChatIntent(text,history);
+  const lastMine=[...history].reverse().find(m=>m.from==='me'&&m.text!==text);
+  // Follow-up acknowledgements get a contextual bridge rather than an unrelated new topic.
+  if(lastMine && /^(嗯|恩|對|對啊|是啊|好|好吧|不知道|算了|沒事|真的|然後|可是|但是|因為)/.test(text.trim()) && intent==='fallback'){
+    const bridges={
+      wenshu:['嗯，我在聽。接著呢？','好。那前面那件事，妳現在最卡的是哪裡？','我知道。妳不用一次講完，接著說。'],
+      yanyan:['嗯嗯，我有跟上。然後呢？','好，我懂你的意思了。你繼續說。','沒關係，慢慢來，我還在聽。'],
+      sichuan:['嗯，然後？我有跟上。','好啦，繼續。不要講一半。','行，我知道你在接前面那件事。然後咧？']
+    };
+    return pickReply(bridges[id],history);
+  }
+  return pickReply(r[intent]||r.fallback,history);
+}
 function chatKey(id){return 'side-chat-'+id}
 function getChat(id){return JSON.parse(localStorage.getItem(chatKey(id))||'[]')}
 function saveChat(id,a){localStorage.setItem(chatKey(id),JSON.stringify(a))}
 function openChat(id){chatProfileId=id;markChatRead(id);const p=profiles[id];$('#chatAvatar').src=p.img;$('#chatName').textContent=p.name;$('#chatStatus').textContent='通常 '+p.reply.replace('通常於','') ;renderChat();$('#chatModal').classList.add('open');$('#chatModal').setAttribute('aria-hidden','false');setTimeout(()=>$('#chatInput').focus(),250)}
 function closeChat(){clearTimeout(typingTimer);$('#chatTyping').classList.remove('show');$('#chatModal').classList.remove('open');$('#chatModal').setAttribute('aria-hidden','true');updateUnreadBadge();}
 function renderChat(){if(!chatProfileId)return;const a=getChat(chatProfileId), box=$('#chatMessages');box.innerHTML=a.length?a.map(m=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。</div>`;box.scrollTop=box.scrollHeight}
-function replyFor(id,text){const r=chatReplies[id],t=text.toLowerCase();let pool=r.default;if(/嗨|哈囉|hello|在嗎|你好/.test(t))pool=r.hello;else if(/約|預約|有空|時間|哪天/.test(t))pool=r.busy;else if(/難過|哭|累|失戀|不開心|痛苦/.test(t))pool=r.sad;else if(/吃|飯|餓|餐廳/.test(t))pool=r.food;return pool[Math.floor(Math.random()*pool.length)]}
 function sendChat(){if(!chatProfileId)return;const id=chatProfileId,input=$('#chatInput'),text=input.value.trim();if(!text)return;const a=getChat(id),now=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});a.push({from:'me',text,time:now,ts:Date.now()});saveChat(id,a);input.value='';renderChat();$('#chatTyping').classList.add('show');const delay=900+Math.floor(Math.random()*1300);typingTimer=setTimeout(()=>{const b=getChat(id);b.push({from:'them',text:replyFor(id,text),time:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),ts:Date.now()});saveChat(id,b);if(chatProfileId===id && $('#chatModal').classList.contains('open')){markChatRead(id);$('#chatTyping').classList.remove('show');renderChat()}else{setChatUnread(id,true);updateUnreadBadge()}renderConversations()},delay)}
 
 renderCards(); let initial=location.hash.slice(1); if(['search','ranking','records','messages','account'].includes(initial))go(initial); updateUnreadBadge();
@@ -108,4 +201,4 @@ function renderRecords(){
 
 $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}}); $('#chatModal').onclick=e=>{if(e.target===$('#chatModal'))closeChat()};
 
-// SIDE v9 verified messages build
+// SIDE v10 contextual chat build
