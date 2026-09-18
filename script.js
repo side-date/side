@@ -64,15 +64,15 @@ function bindSwipeRow(row){
  surface.addEventListener('touchmove',e=>{const t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;if(Math.abs(x)>8&&Math.abs(x)>Math.abs(y)){drag=true;dx=Math.max(-112,Math.min(112,x));surface.style.transform=`translateX(${dx}px)`}},{passive:true});
  surface.addEventListener('touchend',()=>{
    surface.style.transition='transform .2s ease';suppressClick=drag;
-   // 使用者指定：手指往右滑 = 刪除；手指往左滑 = 置頂。
-   // confirm 必須直接在 touchend 的使用者手勢中執行；不可包 setTimeout，否則 iOS Safari 可能擋掉。
-   if(dx>=60){
-     surface.style.transform='translateX(112px)';
+   // 只調整聊天室滑動方向：向左滑顯示左側刪除；向右滑顯示右側置頂。
+   // 其餘聊天回覆、預約與資料邏輯維持不變。
+   if(dx<=-60){
+     surface.style.transform='translateX(-112px)';
      const ok=window.confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`);
      if(ok){localStorage.removeItem(chatKey(id));clearChatState(id);setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}
      else surface.style.transform='translateX(0)';
-   }else if(dx<=-60){
-     surface.style.transform='translateX(-112px)';
+   }else if(dx>=60){
+     surface.style.transform='translateX(112px)';
      const on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂');
    }else surface.style.transform='translateX(0)';
    setTimeout(()=>suppressClick=false,250);

@@ -35,10 +35,10 @@ nav button[data-go="messages"]{position:relative}
 /* v26 — clean conversation swipe + booking-record swipe */
 .swipeRow{position:relative;overflow:hidden;margin:0 0 12px;background:#eee7e2;min-height:92px}
 .swipeRow .action{position:absolute;top:0;bottom:0;width:112px;display:flex;align-items:center;justify-content:center;font-size:15px;letter-spacing:.08em;z-index:1}
-/* 手指往右滑時卡片往右，露出左側 DELETE */
-.swipeRow .deleteAction{left:0;right:auto;background:#8b5f59;color:#fff}
-/* 手指往左滑時卡片往左，露出右側 PIN */
-.swipeRow .pinAction{right:0;left:auto;background:#d9cec7;color:#4f4541}
+/* 向左滑：露出右側 DELETE */
+.swipeRow .deleteAction{right:0;left:auto;background:#8b5f59;color:#fff}
+/* 向右滑：露出左側 PIN */
+.swipeRow .pinAction{left:0;right:auto;background:#d9cec7;color:#4f4541}
 .swipeSurface{position:relative;z-index:3;display:flex;align-items:center;gap:18px;min-height:92px;padding:16px 20px;background:#fff;border:1px solid #e6dcd6;touch-action:pan-y;will-change:transform}
 .swipeSurface img{width:64px;height:64px;border-radius:50%;object-fit:cover;flex:0 0 64px}
 .swipeSurface .conversationText{min-width:0;flex:1;display:flex;flex-direction:column;gap:7px}
