@@ -209,17 +209,34 @@ function quickFor(topic){
 }
 function replyFor(id,text){
  const t=String(text).trim(),p=personaLine[id],st=getChatState(id);
- if(/預約|想約|約你|可以約/.test(t)){clearChatState(id);return {text:id==='sichuan'?'可以。直接去選日期，別在這裡一個數字一個數字對。':id==='wenshu'?'可以。正式日期直接從預約頁選，這樣比較不會弄錯。':'可以呀～直接看看可預約日期吧。',action:'booking',label:'查看可預約日期'};}
+ // 功能型意圖永遠最高優先：聊天室不再自行猜日期/時間。
+ if(/預約|想約|約你|可以約|有空嗎|哪天有空/.test(t)){
+   clearChatState(id);
+   return {text:id==='sichuan'?'可以。直接去預約頁選日期。':id==='wenshu'?'可以。日期和時間直接從預約頁選，這樣不會弄錯。':'可以呀～直接從預約頁選日期和時間吧。',action:'booking',label:'前往預約'};
+ }
+ // 已進入某個主題時，先依「目前話題」理解新句子，不重新從零分類。
+ if(st.topic==='food'){
+   if(/建議|你覺得|吃什麼|幫我(挑|選)|推薦/.test(t)) return quickReplyFor(id,'foodPick');
+   if(/薯條|炸物|炸的|雞排|鹽酥雞/.test(t)) return {text:id==='sichuan'?'薯條可以，但你要是很餓，最好再補點真的能頂肚子的。':id==='wenshu'?'薯條可以。如果妳是真的餓，我會建議再配一點比較能當正餐的東西。':'薯條可以呀～但如果真的很餓，我會再配一點正餐。',quick:[['那你幫我挑','foodPick'],['我就想吃薯條','foodSelf'],['算了不吃','foodNo']]};
+   if(/^(沒有|沒|還沒|沒吃)[啊呀。！! ]*$/.test(t)) return {text:id==='sichuan'?'難怪。那你現在想吃什麼？':id==='wenshu'?'難怪會餓。妳現在比較想吃什麼？':'難怪會餓呀。那你現在想吃什麼？',quick:[['幫我挑','foodPick'],['我自己選','foodSelf']]};
+   if(/不想吃|不吃|沒胃口/.test(t)) return quickReplyFor(id,'foodNo');
+ }
+ if(st.topic==='mood'||st.topic==='love'||st.topic==='work'){
+   if(/意見|建議|你覺得|怎麼辦|怎麼做/.test(t)) return quickReplyFor(id,'advice');
+   if(/聽我|我想說|讓我說|抱怨/.test(t)) return quickReplyFor(id,'listen');
+   if(/不想講|換話題|別聊|轉移/.test(t)) return quickReplyFor(id,'distract');
+   if(t.length>=3) return {text:id==='sichuan'?'嗯，我有在聽。這件事讓你最不爽的是哪一段？':id==='wenshu'?'嗯，我有跟上。這件事裡，現在最讓妳難受的是哪一部分？':'嗯，我有在聽。這件事裡現在最讓你不舒服的是哪一部分？',quick:[['我繼續說','listen'],['給我意見','advice'],['換個話題','distract']]};
+ }
+ if(st.topic==='idle' && /建議|做什麼|幹嘛|不知道/.test(t)) return quickReplyFor(id,'idleDo');
+ if(st.topic==='sleep' && /想很多|停不下來|腦袋|一直想/.test(t)) return quickReplyFor(id,'sleepThink');
+ // 開啟新主題。
  if(/心情不好|今天不好|不開心|難過|想哭|委屈|低落|很煩/.test(t)){saveChatState(id,{topic:'mood'});return {text:p.mood,quick:quickFor('mood')};}
- if(/好餓|很餓|餓死|肚子餓/.test(t)){saveChatState(id,{topic:'food'});return {text:p.food,quick:quickFor('food')};}
+ if(/好餓|很餓|餓死|肚子餓|沒吃飯|還沒吃/.test(t)){saveChatState(id,{topic:'food'});return {text:p.food,quick:quickFor('food')};}
  if(/無聊|好無聊/.test(t)){saveChatState(id,{topic:'idle'});return {text:p.idle,quick:quickFor('idle')};}
  if(/睡不著|失眠|不睏|不困/.test(t)){saveChatState(id,{topic:'sleep'});return {text:p.sleep,quick:quickFor('sleep')};}
  if(/失戀|分手|前任|感情|曖昧|男友|女友/.test(t)){saveChatState(id,{topic:'love'});return {text:p.love,quick:quickFor('love')};}
  if(/工作|上班|加班|主管|老闆|同事|好累|很累/.test(t)){saveChatState(id,{topic:'work'});return {text:p.work,quick:quickFor('work')};}
  if(/^(嗨|哈囉|hi|hello|在嗎|你好)[!！?？。 ]*$/i.test(t)){clearChatState(id);return {text:p.hello,quick:quickFor('root')};}
- if(st.topic && t.length>=4){
-   if(st.topic==='mood'||st.topic==='love'||st.topic==='work'){return {text:id==='sichuan'?'嗯，我有在聽。你繼續。':id==='wenshu'?'嗯，我有跟上。妳繼續說。':'嗯，我有在聽。你繼續說沒關係。',quick:[['聽我說','listen'],['給我意見','advice'],['換個話題','distract']]};}
- }
  return {text:p.unknown,quick:quickFor('root')};
 }
 function quickReplyFor(id,key){
@@ -272,6 +289,7 @@ function appendBotReply(id,obj){
 }
 function sendQuickReply(key,label){
  if(!chatProfileId)return;const id=chatProfileId,a=getChat(id),now=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+ const topicMap={mood:'mood',listen:getChatState(id).topic||'mood',advice:getChatState(id).topic||'mood',food:'food',foodPick:'food',foodSelf:'food',foodNo:'food',foodRice:'food',foodNoodle:'food',foodFried:'food',idle:'idle',idleChat:'idle',idleDo:'idle',idleRandom:'idle',sleep:'sleep',sleepThink:'sleep',sleepAwake:'sleep',love:'love',work:'work'};if(topicMap[key])saveChatState(id,{topic:topicMap[key]});
  a.push({from:'me',text:label,time:now,ts:Date.now()});saveChat(id,a);renderChat();$('#chatTyping').classList.add('show');
  setTimeout(()=>appendBotReply(id,quickReplyFor(id,key)),500+Math.floor(Math.random()*450));
 }
@@ -336,3 +354,5 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE BUILD v15: RIGHT swipe = pin(left reveal), LEFT swipe = delete(right reveal)
 
 // SIDE BUILD v17 bounded dialogue tree + quick replies + booking CTA
+
+// SIDE BUILD v18 topic-aware free text + guaranteed booking CTA
