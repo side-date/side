@@ -60,12 +60,21 @@ function renderConversations(){
 function bindSwipeRow(row){
  const surface=row.querySelector('.swipeSurface'),id=row.dataset.chatId;
  let sx=0,sy=0,dx=0,drag=false,suppressClick=false;
- surface.addEventListener('touchstart',e=>{let t=e.touches[0];sx=t.clientX;sy=t.clientY;dx=0;drag=false;surface.style.transition='none'},{passive:true});
- surface.addEventListener('touchmove',e=>{let t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;if(Math.abs(x)>8&&Math.abs(x)>Math.abs(y)){drag=true;dx=Math.max(-104,Math.min(104,x));surface.style.transform=`translateX(${dx}px)`}},{passive:true});
- surface.addEventListener('touchend',()=>{surface.style.transition='transform .2s ease';suppressClick=drag;
-   if(dx<=-55){surface.style.transform='translateX(-104px)';setTimeout(()=>{let on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},80)}
-   else if(dx>=55){surface.style.transform='translateX(104px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));clearChatState(id);setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else surface.style.transform='translateX(0)'},80)}
-   else surface.style.transform='translateX(0)';
+ surface.addEventListener('touchstart',e=>{const t=e.touches[0];sx=t.clientX;sy=t.clientY;dx=0;drag=false;surface.style.transition='none'},{passive:true});
+ surface.addEventListener('touchmove',e=>{const t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;if(Math.abs(x)>8&&Math.abs(x)>Math.abs(y)){drag=true;dx=Math.max(-112,Math.min(112,x));surface.style.transform=`translateX(${dx}px)`}},{passive:true});
+ surface.addEventListener('touchend',()=>{
+   surface.style.transition='transform .2s ease';suppressClick=drag;
+   // 使用者指定：手指往右滑 = 刪除；手指往左滑 = 置頂。
+   // confirm 必須直接在 touchend 的使用者手勢中執行；不可包 setTimeout，否則 iOS Safari 可能擋掉。
+   if(dx>=60){
+     surface.style.transform='translateX(112px)';
+     const ok=window.confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`);
+     if(ok){localStorage.removeItem(chatKey(id));clearChatState(id);setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}
+     else surface.style.transform='translateX(0)';
+   }else if(dx<=-60){
+     surface.style.transform='translateX(-112px)';
+     const on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂');
+   }else surface.style.transform='translateX(0)';
    setTimeout(()=>suppressClick=false,250);
  });
  surface.addEventListener('click',()=>{if(!suppressClick&&!drag)openChat(id)});
@@ -90,8 +99,8 @@ const personaVoice={
   }
 };
 function stateKey(id){return `side-chat-state-${id}`}
-function getChatState(id){try{const s=JSON.parse(localStorage.getItem(stateKey(id))||'{}');if(s.__engineVersion!==24)return {__engineVersion:24};return s}catch(e){return {__engineVersion:24}}}
-function saveChatState(id,s){s.__engineVersion=24;localStorage.setItem(stateKey(id),JSON.stringify(s))}
+function getChatState(id){try{const s=JSON.parse(localStorage.getItem(stateKey(id))||'{}');if(s.__engineVersion!==26)return {__engineVersion:26};return s}catch(e){return {__engineVersion:26}}}
+function saveChatState(id,s){s.__engineVersion=26;localStorage.setItem(stateKey(id),JSON.stringify(s))}
 function clearChatState(id){localStorage.removeItem(stateKey(id))}
 function patchState(id,patch){const s=getChatState(id);Object.assign(s,patch);saveChatState(id,s);return s}
 function remember(id,key,value){const s=getChatState(id);s.memory=s.memory||{};s.memory[key]=value;s.lastTopic=key;saveChatState(id,s)}
@@ -112,6 +121,12 @@ function eventReply(id,text){
    return {text:id==='sichuan'?'可以。日期跟時段直接去預約頁選。':id==='wenshu'?'可以。日期和時段直接到預約頁確認，這樣不會弄錯。':'可以呀～直接到預約頁選日期和時段吧。',action:'booking',label:'前往預約'};
  }
 
+ // v26：最常見的具體事件要在任何 mood/fallback 之前硬接住。
+ if(has(t,/^(?:今天)?(?:我)?被(?:人|朋友|同事|主管|老闆|家人)?(?:罵|兇)(?:了|一頓)?[。！! ]*$/)||has(t,/^(?:今天)?有人(?:罵|兇)我(?:了)?[。！! ]*$/)){
+   setEvent('incident',1,{incident:t});
+   return {text:id==='sichuan'?'誰罵你？為什麼罵你？':id==='wenshu'?'被人罵了？是誰？為什麼罵妳？':'被人罵了？是誰呀？為什麼罵你？'};
+ }
+
  // 對「上一則回覆」的反應，優先級最高。
  if(has(t,/^[？?]+$/)){
    setEvent('repair');
@@ -122,6 +137,11 @@ function eventReply(id,text){
    return {text:id==='sichuan'?'……行，剛剛是我接爛了。你前面那件事我沒忘，別重講。':id==='wenshu'?'妳說得對，剛剛是我沒有接住前文。前面的事不用重講，我還記得。':'你說得對，剛剛是我沒有接住前文。前面的事情不用重講，我記得。'};
  }
 
+ if(has(t,/不是(應該|要).*問我|你(不|沒)問.*為什麼|你怎麼不問|為什麼不問我/)){
+   const inc=s.incident||'';
+   if(/罵|兇/.test(inc)) return {text:id==='sichuan'?'……對。那我問，誰罵你？為什麼罵你？':id==='wenshu'?'對，我剛剛應該先問原因。是誰罵妳？為什麼罵妳？':'對，我剛剛應該先問原因。是誰罵你？為什麼罵你？'};
+   return {text:id==='sichuan'?'行，那我直接問。為什麼？':id==='wenshu'?'對，我剛剛應該先問原因。為什麼？':'對，我剛剛應該先問原因。為什麼呀？'};
+ }
  // v24：先處理「上一件事的情緒結果」，不能再被舊事件或 fallback 吃掉。
  if(s.incident && has(t,/不開心|難過|生氣|很氣|委屈|很煩|不爽|想哭|心情.*不好|很受傷|很難受/)){
    setEvent('incident_feeling',2,{incident:s.incident});
@@ -129,10 +149,17 @@ function eventReply(id,text){
    return {text:id==='sichuan'?'難怪你心情差。那件事裡最讓你火大的是哪一段？':id==='wenshu'?'難怪妳會不舒服。那件事裡最讓妳難受的是哪一部分？':'難怪你會不開心。那件事裡最讓你難受的是哪一部分？'};
  }
 
- // v24：具體事件句永遠可以接在「心情不好」後面，並保存原句。
- if(has(t,/有人罵我|有人兇我|被罵|被兇|跟人吵架|有人欺負我|有人放我鴿子|有人騙我|朋友.*(罵|兇|吵)|同事.*(罵|兇|吵)|主管.*(罵|兇)|老闆.*(罵|兇)/)){
+ // v25：心情事件後的具體原因，優先接住，不能落入 fallback。
+ if((s.event==='mood'||s.event==='company') && has(t,/被.*(?:罵|兇|欺負|拒絕|放鴿子)|有人.*(?:罵|兇|欺負|拒絕|騙)|跟.*吵架|吵了一架/)){
    setEvent('incident',1,{incident:t});
-   if(has(t,/罵|兇/)) return {text:id==='sichuan'?'誰罵你？他憑什麼？':id==='wenshu'?'有人罵妳？是誰？事情怎麼開始的？':'有人罵你？是誰呀？事情怎麼開始的？'};
+   if(has(t,/罵|兇/)) return {text:id==='sichuan'?'誰罵你？為什麼？':id==='wenshu'?'被人罵了？是誰？為什麼罵妳？':'被人罵了？是誰呀？為什麼罵你？'};
+   return {text:id==='sichuan'?'嗯，這件事我跟上了。怎麼發生的？':id==='wenshu'?'嗯，我跟上了。事情是怎麼發生的？':'嗯，我跟上了。事情是怎麼發生的呀？'};
+ }
+
+ // v24：具體事件句永遠可以接在「心情不好」後面，並保存原句。
+ if(has(t,/有人(?:罵|兇)我|被(?:人|朋友|同事|主管|老闆|家人)?(?:罵|兇)(?:了|一頓)?|跟人吵架|有人欺負我|有人放我鴿子|有人騙我|朋友.*(?:罵|兇|吵)|同事.*(?:罵|兇|吵)|主管.*(?:罵|兇)|老闆.*(?:罵|兇)/)){
+   setEvent('incident',1,{incident:t});
+   if(has(t,/罵|兇/)) return {text:id==='sichuan'?'誰罵你？他憑什麼？':id==='wenshu'?'被人罵了？是誰？為什麼罵妳？':'被人罵了？是誰呀？為什麼罵你？'};
    if(has(t,/吵架|吵/)) return {text:id==='sichuan'?'跟誰吵？怎麼吵起來的？':id==='wenshu'?'跟誰吵起來了？事情怎麼開始的？':'跟誰吵架了？怎麼開始的呀？'};
    return {text:id==='sichuan'?'嗯，這件事我記住了。後來呢？':id==='wenshu'?'嗯，我記住這件事了。後來呢？':'嗯，我有跟上。後來呢？'};
  }
@@ -181,7 +208,11 @@ function eventReply(id,text){
 
  // 延續具體事件：使用者補充原因／人物／細節。
  if(s.event==='incident'||s.event==='incident_feeling'){
-   if(t.length>=3){setEvent('incident',Math.min((s.step||1)+1,5),{incident:(s.incident||'')+'；'+t});return {text:id==='sichuan'?'嗯，這樣就說得通了。那你當下有回他嗎？':id==='wenshu'?'我知道了。那妳當下有回應對方嗎？':'我懂了。那你當下有回他嗎？'};}
+   if(t.length>=2){
+     const combined=(s.incident||'')+'；'+t; setEvent('incident',Math.min((s.step||1)+1,5),{incident:combined});
+     if(/因為|說我|覺得我|怪我|嫌我|罵我/.test(t)) return {text:id==='sichuan'?'就因為這樣？那他講話也不用那麼難聽。你當下有回他嗎？':id==='wenshu'?'我知道原因了。但就算有事情要談，也不代表對方可以用罵的。妳當下有回他嗎？':'我知道原因了。可是有事情可以好好說，不一定要用罵的。你當下有回他嗎？'};
+     return {text:id==='sichuan'?'嗯，我跟上了。然後你怎麼回？':id==='wenshu'?'嗯，我跟上了。那妳當下怎麼回應？':'嗯，我跟上了。那你當下怎麼回呀？'};
+   }
  }
 
  // 各主題內的真正延續。
@@ -287,7 +318,7 @@ function renderRecords(){
  if(!a.length){el.innerHTML='<div class="recordEmpty"><div>♡</div><h2>目前沒有預約紀錄</h2><p>完成預約後，紀錄會顯示在這裡。</p><button onclick="go(\'search\')">瀏覽陪伴者</button></div>';return}
  el.innerHTML=a.map((r,i)=>{let p=profiles[r.id];return `<div class="recordSwipe" data-record-index="${i}"><div class="recordSwipeDelete">刪除</div><article class="recordCard recordSurface"><div class="recordTop"><small>BOOKING CONFIRMED</small><button type="button" class="recordDelete" data-record-index="${i}">刪除紀錄</button></div><h2>${p?p.name:r.id}</h2><div class="recordMeta"><span>日期　${r.date}</span><span>時間　${r.time}</span><span>方案　${r.plan}</span><span>狀態　預約成立</span></div></article></div>`}).join('');
  $$('.recordDelete').forEach(b=>b.onclick=()=>deleteBookingRecord(+b.dataset.recordIndex));
- $$('.recordSwipe').forEach(row=>{let s=row.querySelector('.recordSurface'),sx=0,dx=0;s.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;dx=0;s.style.transition='none'},{passive:true});s.addEventListener('touchmove',e=>{dx=Math.max(0,Math.min(104,e.touches[0].clientX-sx));s.style.transform=`translateX(${dx}px)`},{passive:true});s.addEventListener('touchend',()=>{s.style.transition='transform .2s ease';if(dx>55){s.style.transform='translateX(104px)';setTimeout(()=>deleteBookingRecord(+row.dataset.recordIndex),80)}else s.style.transform='translateX(0)'})});
+ $$('.recordSwipe').forEach(row=>{let s=row.querySelector('.recordSurface'),sx=0,dx=0;s.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;dx=0;s.style.transition='none'},{passive:true});s.addEventListener('touchmove',e=>{dx=Math.max(0,Math.min(104,e.touches[0].clientX-sx));s.style.transform=`translateX(${dx}px)`},{passive:true});s.addEventListener('touchend',()=>{s.style.transition='transform .2s ease';if(dx>55){s.style.transform='translateX(104px)';deleteBookingRecord(+row.dataset.recordIndex)}else s.style.transform='translateX(0)'})});
 }
 
 
@@ -313,4 +344,4 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 
 // SIDE BUILD v20: normal chat has zero quick replies; booking CTA only
 
-// SIDE BUILD v24: cache-busted contextual event engine; right swipe delete / left swipe pin
+// SIDE BUILD v26: iOS-safe delete; swipe RIGHT delete / LEFT pin; hard incident routing

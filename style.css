@@ -32,64 +32,25 @@
 /* SIDE v9: messages navigation verified */
 nav button[data-go="messages"]{position:relative}
 
-/* v11 — swipe conversations + record deletion */
-.conversationSwipe{position:relative;overflow:hidden;margin-bottom:10px;background:#f4efec}
-.conversationSwipe .conversationMain{position:relative;z-index:2;width:100%;background:#fff;touch-action:pan-y;will-change:transform}
-.swipeAction{position:absolute;top:0;bottom:0;width:96px;display:flex;align-items:center;justify-content:center;font-size:14px;letter-spacing:.08em;z-index:1}
-.swipeDelete{left:0;background:#8d5f59;color:#fff}
-.swipePin{right:0;background:#d8cec8;color:#4f4642}
-.conversationDelete{display:none!important}
-.recordTop{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.recordDelete{border:0;background:transparent;color:#9a746d;font-size:13px;padding:8px 0;text-decoration:underline;text-underline-offset:3px}
-
-/* SIDE v12: gesture-only conversation actions */
+/* v26 — clean conversation swipe + booking-record swipe */
 .swipeRow{position:relative;overflow:hidden;margin:0 0 12px;background:#eee7e2;min-height:92px}
+.swipeRow .action{position:absolute;top:0;bottom:0;width:112px;display:flex;align-items:center;justify-content:center;font-size:15px;letter-spacing:.08em;z-index:1}
+/* 手指往右滑時卡片往右，露出左側 DELETE */
+.swipeRow .deleteAction{left:0;right:auto;background:#8b5f59;color:#fff}
+/* 手指往左滑時卡片往左，露出右側 PIN */
+.swipeRow .pinAction{right:0;left:auto;background:#d9cec7;color:#4f4541}
 .swipeSurface{position:relative;z-index:3;display:flex;align-items:center;gap:18px;min-height:92px;padding:16px 20px;background:#fff;border:1px solid #e6dcd6;touch-action:pan-y;will-change:transform}
 .swipeSurface img{width:64px;height:64px;border-radius:50%;object-fit:cover;flex:0 0 64px}
 .swipeSurface .conversationText{min-width:0;flex:1;display:flex;flex-direction:column;gap:7px}
 .swipeSurface .conversationText b{font-size:17px}
 .swipeSurface .conversationText small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#8f8580}
 .swipeSurface .conversationSide{display:flex;align-items:flex-end;flex-direction:column;gap:8px;color:#a79c96;flex:0 0 auto}
-.swipeRow .action{position:absolute;top:0;bottom:0;width:104px;display:flex;align-items:center;justify-content:center;font-size:15px;letter-spacing:.08em;z-index:1}
-.deleteAction{left:0;background:#8b5f59;color:#fff}
-.pinAction{right:0;background:#d9cec7;color:#4f4541}
 .conversationDelete,.conversationSwipe{display:none!important}
 .recordSwipe{position:relative;overflow:hidden;margin-bottom:16px;background:#8b5f59}
 .recordSwipeDelete{position:absolute;left:0;top:0;bottom:0;width:104px;color:#fff;display:flex;align-items:center;justify-content:center}
 .recordSwipe .recordCard{position:relative;z-index:2;margin:0;background:#fff;touch-action:pan-y;will-change:transform}
 .recordTop{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .recordDelete{border:0;background:transparent;color:#98736c;text-decoration:underline;text-underline-offset:4px;font-size:13px;padding:8px}
-
-/* SIDE v13 directions: swipe LEFT = delete, swipe RIGHT = pin */
-.swipeRow .deleteAction{left:auto!important;right:0!important;background:#8b5f59!important;color:#fff!important}
-.swipeRow .pinAction{right:auto!important;left:0!important;background:#d9cec7!important;color:#4f4541!important}
-
-/* SIDE v15 — authoritative swipe positions
-   向右滑（surface +X）露出左側：置頂
-   向左滑（surface -X）露出右側：刪除 */
-.swipeRow{position:relative!important;overflow:hidden!important}
-.swipeRow .pinAction{
-  position:absolute!important;
-  left:0!important;
-  right:auto!important;
-  top:0!important;
-  bottom:0!important;
-  width:104px!important;
-  background:#d9cec7!important;
-  color:#4f4541!important;
-  z-index:1!important;
-}
-.swipeRow .deleteAction{
-  position:absolute!important;
-  right:0!important;
-  left:auto!important;
-  top:0!important;
-  bottom:0!important;
-  width:104px!important;
-  background:#8b5f59!important;
-  color:#fff!important;
-  z-index:1!important;
-}
 
 /* SIDE v17 — bounded dialogue tree */
 .quickReplies{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px}
@@ -107,11 +68,7 @@ nav button[data-go="messages"]{position:relative}
 .chatWelcome .quickReplies{display:none!important}
 .chatAction[data-action="booking"]{display:block!important}
 
-/* SIDE v21 — swipe positions requested: right swipe = delete, left swipe = pin */
-.swipeRow .deleteAction{left:0!important;right:auto!important;background:#8b5f59!important;color:#fff!important}
-.swipeRow .pinAction{right:0!important;left:auto!important;background:#d9cec7!important;color:#4f4541!important}
-/* Normal chat never shows quick-reply chips. Booking CTA is the only in-chat action. */
-.quickReplies,.chatQuickReplies{display:none!important}
+/* v26 — normal chat never shows quick replies; booking CTA only */
+.quickReplies,.chatQuickReplies,.rootQuick{display:none!important}
 .chatAction{display:none!important}
 .chatAction[data-action="booking"]{display:block!important}
-\n/* SIDE v24 authoritative conversation swipe mapping:\n   swipe RIGHT -> DELETE (left action revealed)\n   swipe LEFT  -> PIN (right action revealed) */\n.swipeRow .deleteAction{left:0!important;right:auto!important;background:#8b5f59!important;color:#fff!important}\n.swipeRow .pinAction{right:0!important;left:auto!important;background:#d9cec7!important;color:#4f4541!important}\n
