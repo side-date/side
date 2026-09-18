@@ -4,7 +4,7 @@ const profiles={"wenshu": {"name": "聞舒", "age": "39歲", "img": "wenshu.jpg"
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 let lastPage='search', currentFilter='all';
 const searchText=p=>[p.name,p.age,p.location,...p.tags,...p.services,...p.badges].join(' ').toLowerCase();
-function go(id){ $$('.page').forEach(x=>x.classList.remove('active')); $('#'+id).classList.add('active'); document.querySelector('nav').classList.remove('open'); window.scrollTo(0,0); if(id==='search') renderCards(); if(id==='account') renderFavorites(); if(id==='records') renderRecords(); history.replaceState(null,'','#'+id); }
+function go(id){ $$('.page').forEach(x=>x.classList.remove('active')); $('#'+id).classList.add('active'); document.querySelector('nav').classList.remove('open'); window.scrollTo(0,0); if(id==='search') renderCards(); if(id==='account') renderFavorites(); if(id==='records') renderRecords(); if(id==='messages') renderConversations(); history.replaceState(null,'','#'+id); }
 $$('[data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go)); $('.menu').onclick=()=>document.querySelector('nav').classList.toggle('open');
 function cardHTML(id,p){const full=id==='wenshu';return `<article class="card ${id}" data-profile="${id}"><div class="cardImg"><img src="${p.img}" alt="${p.name}"><span class="status">${full?'本月額滿':p.quota}</span></div><div class="cardBody"><small>${p.rank.replace('🏆 ','').toUpperCase()}</small><h2>${p.name}｜${p.age.replace('歲','')}</h2><p>${p.tags.slice(0,3).join('　')}</p><div class="cardMeta"><span class="star">★ ${p.rating}</span><span>${p.location.replace('📍 ','').split('（')[0]}</span></div></div></article>`}
 function renderCards(){let q=($('#q')?.value||'').trim().toLowerCase();let list=Object.entries(profiles).filter(([id,p])=>{let ok=!q||searchText(p).includes(q);if(currentFilter==='available')ok=ok&&!p.full;else if(currentFilter!=='all')ok=ok&&searchText(p).includes(currentFilter.toLowerCase());return ok});$('#cards').innerHTML=list.map(([id,p])=>cardHTML(id,p)).join('');$('#resultCount').textContent=`${list.length} 位陪伴者`;$('#empty').style.display=list.length?'none':'block';$$('#cards [data-profile]').forEach(x=>x.onclick=()=>openProfile(x.dataset.profile));}
@@ -39,6 +39,23 @@ document.addEventListener('click',function(e){
   toggleReviewLike(btn);
 });
 
+
+function unreadKey(){return 'side-chat-unread'}
+function getUnread(){return JSON.parse(localStorage.getItem(unreadKey())||'{}')}
+function setChatUnread(id,value){const u=getUnread();if(value)u[id]=true;else delete u[id];localStorage.setItem(unreadKey(),JSON.stringify(u))}
+function markChatRead(id){setChatUnread(id,false);updateUnreadBadge()}
+function updateUnreadBadge(){const n=Object.keys(getUnread()).length,el=$('#navUnread');if(!el)return;el.textContent=n?String(n):'';el.classList.toggle('show',n>0)}
+function lastChatTime(m){if(m&&m.ts)return m.ts;return 0}
+function renderConversations(){
+  const el=$('#conversationList');if(!el)return;
+  const unread=getUnread();
+  const rows=Object.keys(profiles).map(id=>({id,p:profiles[id],chat:getChat(id)})).filter(x=>x.chat.length).sort((a,b)=>lastChatTime(b.chat[b.chat.length-1])-lastChatTime(a.chat[a.chat.length-1]));
+  if(!rows.length){el.innerHTML='<div class="messageEmpty"><div>💬</div><h2>目前沒有訊息</h2><p>從陪伴者頁面按「發送訊息」，聊天紀錄就會出現在這裡。</p><button data-go-msg="search">尋找陪伴者</button></div>';const b=el.querySelector('[data-go-msg]');if(b)b.onclick=()=>go('search');return}
+  el.innerHTML=rows.map(({id,p,chat})=>{const last=chat[chat.length-1],prefix=last.from==='me'?'你：':'',preview=escapeHTML(last.text).replace(/\n/g,' ');return `<div class="conversation" data-chat-id="${id}"><button class="conversationMain"><img src="${p.img}" alt=""><span class="conversationText"><b>${escapeHTML(p.name)}</b><small>${prefix}${preview}</small></span><span class="conversationSide"><time>${last.time||''}</time>${unread[id]?'<i class="unreadDot">1</i>':''}</span></button><button class="conversationDelete" aria-label="刪除聊天室" title="刪除聊天室">刪除</button></div>`}).join('');
+  $$('.conversationMain').forEach(btn=>btn.onclick=()=>openChat(btn.closest('.conversation').dataset.chatId));
+  $$('.conversationDelete').forEach(btn=>btn.onclick=e=>{e.stopPropagation();const id=btn.closest('.conversation').dataset.chatId;if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));setChatUnread(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}})
+}
+
 function escapeHTML(v){return String(v).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}
 let chatProfileId=null, typingTimer=null;
 const chatReplies={
@@ -49,13 +66,13 @@ const chatReplies={
 function chatKey(id){return 'side-chat-'+id}
 function getChat(id){return JSON.parse(localStorage.getItem(chatKey(id))||'[]')}
 function saveChat(id,a){localStorage.setItem(chatKey(id),JSON.stringify(a))}
-function openChat(id){chatProfileId=id;const p=profiles[id];$('#chatAvatar').src=p.img;$('#chatName').textContent=p.name;$('#chatStatus').textContent='通常 '+p.reply.replace('通常於','') ;renderChat();$('#chatModal').classList.add('open');$('#chatModal').setAttribute('aria-hidden','false');setTimeout(()=>$('#chatInput').focus(),250)}
-function closeChat(){clearTimeout(typingTimer);$('#chatTyping').classList.remove('show');$('#chatModal').classList.remove('open');$('#chatModal').setAttribute('aria-hidden','true')}
+function openChat(id){chatProfileId=id;markChatRead(id);const p=profiles[id];$('#chatAvatar').src=p.img;$('#chatName').textContent=p.name;$('#chatStatus').textContent='通常 '+p.reply.replace('通常於','') ;renderChat();$('#chatModal').classList.add('open');$('#chatModal').setAttribute('aria-hidden','false');setTimeout(()=>$('#chatInput').focus(),250)}
+function closeChat(){clearTimeout(typingTimer);$('#chatTyping').classList.remove('show');$('#chatModal').classList.remove('open');$('#chatModal').setAttribute('aria-hidden','true');updateUnreadBadge();}
 function renderChat(){if(!chatProfileId)return;const a=getChat(chatProfileId), box=$('#chatMessages');box.innerHTML=a.length?a.map(m=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。</div>`;box.scrollTop=box.scrollHeight}
 function replyFor(id,text){const r=chatReplies[id],t=text.toLowerCase();let pool=r.default;if(/嗨|哈囉|hello|在嗎|你好/.test(t))pool=r.hello;else if(/約|預約|有空|時間|哪天/.test(t))pool=r.busy;else if(/難過|哭|累|失戀|不開心|痛苦/.test(t))pool=r.sad;else if(/吃|飯|餓|餐廳/.test(t))pool=r.food;return pool[Math.floor(Math.random()*pool.length)]}
-function sendChat(){if(!chatProfileId)return;const input=$('#chatInput'),text=input.value.trim();if(!text)return;const a=getChat(chatProfileId),now=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});a.push({from:'me',text,time:now});saveChat(chatProfileId,a);input.value='';renderChat();$('#chatTyping').classList.add('show');const delay=900+Math.floor(Math.random()*1300);typingTimer=setTimeout(()=>{const b=getChat(chatProfileId);b.push({from:'them',text:replyFor(chatProfileId,text),time:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})});saveChat(chatProfileId,b);$('#chatTyping').classList.remove('show');renderChat()},delay)}
+function sendChat(){if(!chatProfileId)return;const id=chatProfileId,input=$('#chatInput'),text=input.value.trim();if(!text)return;const a=getChat(id),now=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});a.push({from:'me',text,time:now,ts:Date.now()});saveChat(id,a);input.value='';renderChat();$('#chatTyping').classList.add('show');const delay=900+Math.floor(Math.random()*1300);typingTimer=setTimeout(()=>{const b=getChat(id);b.push({from:'them',text:replyFor(id,text),time:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),ts:Date.now()});saveChat(id,b);if(chatProfileId===id && $('#chatModal').classList.contains('open')){markChatRead(id);$('#chatTyping').classList.remove('show');renderChat()}else{setChatUnread(id,true);updateUnreadBadge()}renderConversations()},delay)}
 
-renderCards(); let initial=location.hash.slice(1); if(['search','ranking','records','account'].includes(initial))go(initial);
+renderCards(); let initial=location.hash.slice(1); if(['search','ranking','records','messages','account'].includes(initial))go(initial); updateUnreadBadge();
 
 
 let bookingProfileId=null;
