@@ -155,91 +155,102 @@ function stateKey(id){return `side-chat-state-${id}`}
 function getChatState(id){try{return JSON.parse(localStorage.getItem(stateKey(id))||'{}')}catch(e){return {}}}
 function saveChatState(id,s){localStorage.setItem(stateKey(id),JSON.stringify(s))}
 function clearChatState(id){localStorage.removeItem(stateKey(id))}
-function cleanAnswer(t){return String(t).trim().replace(/[。！？!?]+$/,'')}
-
+const personaLine={
+ wenshu:{
+  mood:'嗯，我在。現在不用急著把原因講清楚。妳比較需要哪一種？',
+  listen:'好。妳說，我先聽，不分析。',
+  advice:'可以。妳把事情講給我聽，我聽完再給妳想法。',
+  distract:'好，那先不碰讓妳不舒服的事。我們換個話題。',
+  food:'先別餓著。妳想自己選，還是要我幫妳挑？',
+  idle:'可以。妳想聊天，還是想找點事情做？',
+  sleep:'睡不著？是腦子停不下來，還是單純沒有睡意？',
+  love:'感情的事可以說。妳現在比較想被聽著，還是想聽我的看法？',
+  work:'工作讓妳煩？先說最卡的那一件就好。',
+  hello:'嗯，我在。今天想聊什麼？',
+  unknown:'這句我怕理解錯。妳可以再講直接一點，或者從下面選一個。'
+ },
+ yanyan:{
+  mood:'我在。現在不用逼自己整理好情緒。你比較需要哪一種？',
+  listen:'好，我先聽。你慢慢說就好。',
+  advice:'可以呀。你先把事情告訴我，我聽完再陪你一起想。',
+  distract:'好～那我們先換個話題，不一直困在不開心裡。',
+  food:'先不要餓著啦。你想自己選，還是要我陪你挑？',
+  idle:'那我陪你。想聊天，還是找點事情做？',
+  sleep:'睡不著嗎？是有事情一直在想，還是單純不睏？',
+  love:'可以說呀。你想先讓我聽，還是想聽我的想法？',
+  work:'工作很累嗎？你先說今天最煩的是哪一件。',
+  hello:'在呀～今天想聊什麼？',
+  unknown:'我怕我理解錯。你可以再說直接一點，或從下面選一個。'
+ },
+ sichuan:{
+  mood:'……行，今天先不嘴你。你要哪種？',
+  listen:'行，我聽。你講。',
+  advice:'可以。先把事情講完整，我聽完再嘴……不是，再給意見。',
+  distract:'行，不聊那個。換一個，省得你越想越煩。',
+  food:'餓就先處理。你自己選，還是我幫你挑？',
+  idle:'無聊？那你要聊天還是找事做。',
+  sleep:'睡不著？腦子太吵，還是根本不睏？',
+  love:'感情喔。你要我聽，還是要我講難聽但有用的？',
+  work:'工作又怎樣了？挑最煩的那件講。',
+  hello:'在。幹嘛？',
+  unknown:'這句我不亂猜。講直接點，或下面選一個。'
+ }
+};
+function quickFor(topic){
+ const q={
+  root:[['聊聊心情','mood'],['我好餓','food'],['好無聊','idle'],['睡不著','sleep'],['感情問題','love'],['工作好累','work'],['我要預約','booking']],
+  mood:[['聽我說','listen'],['給我意見','advice'],['轉移注意力','distract'],['先陪我一下','stay']],
+  food:[['幫我挑','foodPick'],['我自己選','foodSelf'],['算了不吃','foodNo']],
+  idle:[['陪我聊天','idleChat'],['找事情做','idleDo'],['隨便聊聊','idleRandom']],
+  sleep:[['腦袋停不下來','sleepThink'],['單純不睏','sleepAwake'],['陪我聊一下','idleChat']],
+  love:[['先聽我說','listen'],['給我看法','advice'],['不想講細節','distract']],
+  work:[['我想抱怨','listen'],['幫我想辦法','advice'],['先不聊工作','distract']]
+ };return q[topic]||q.root;
+}
 function replyFor(id,text){
- const allHistory=getChat(id),t=String(text).trim(),r=chatReplies[id],st=getChatState(id);
- // sendChat 已先把本次使用者訊息存入紀錄；回覆判斷時排除最後這一筆，避免把自己當成「上一句」。
- const history=(allHistory.length && allHistory[allHistory.length-1].from==='me' && allHistory[allHistory.length-1].text===t)?allHistory.slice(0,-1):allHistory;
- const prevBot=[...history].reverse().find(m=>m.from==='them');
- const say=p=>pickReply(p,history);
- const set=(topic,waiting,data={})=>saveChatState(id,{topic,waiting,data,updated:Date.now()});
- const reset=()=>clearChatState(id);
-
- // Meta-reactions always take priority: the user is talking about THIS conversation.
- if(/亂回|答非所問|你在回什麼|你有沒有在聽|沒在聽|根本沒聽|你沒聽懂/.test(t)){
-   const p={wenshu:['嗯，剛才是我沒接到妳的意思。不要接著猜了，妳把上一句再給我一次，我照那句回。'],
-            yanyan:['對不起，我剛剛真的接錯了。你把剛才那句再說一次，我不自己亂猜。'],
-            sichuan:['……行，剛剛是我亂接。你上一句重講，我這次照著回。']};return say(p[id]);
+ const t=String(text).trim(),p=personaLine[id],st=getChatState(id);
+ if(/預約|想約|約你|可以約/.test(t)){clearChatState(id);return {text:id==='sichuan'?'可以。直接去選日期，別在這裡一個數字一個數字對。':id==='wenshu'?'可以。正式日期直接從預約頁選，這樣比較不會弄錯。':'可以呀～直接看看可預約日期吧。',action:'booking',label:'查看可預約日期'};}
+ if(/心情不好|今天不好|不開心|難過|想哭|委屈|低落|很煩/.test(t)){saveChatState(id,{topic:'mood'});return {text:p.mood,quick:quickFor('mood')};}
+ if(/好餓|很餓|餓死|肚子餓/.test(t)){saveChatState(id,{topic:'food'});return {text:p.food,quick:quickFor('food')};}
+ if(/無聊|好無聊/.test(t)){saveChatState(id,{topic:'idle'});return {text:p.idle,quick:quickFor('idle')};}
+ if(/睡不著|失眠|不睏|不困/.test(t)){saveChatState(id,{topic:'sleep'});return {text:p.sleep,quick:quickFor('sleep')};}
+ if(/失戀|分手|前任|感情|曖昧|男友|女友/.test(t)){saveChatState(id,{topic:'love'});return {text:p.love,quick:quickFor('love')};}
+ if(/工作|上班|加班|主管|老闆|同事|好累|很累/.test(t)){saveChatState(id,{topic:'work'});return {text:p.work,quick:quickFor('work')};}
+ if(/^(嗨|哈囉|hi|hello|在嗎|你好)[!！?？。 ]*$/i.test(t)){clearChatState(id);return {text:p.hello,quick:quickFor('root')};}
+ if(st.topic && t.length>=4){
+   if(st.topic==='mood'||st.topic==='love'||st.topic==='work'){return {text:id==='sichuan'?'嗯，我有在聽。你繼續。':id==='wenshu'?'嗯，我有跟上。妳繼續說。':'嗯，我有在聽。你繼續說沒關係。',quick:[['聽我說','listen'],['給我意見','advice'],['換個話題','distract']]};}
  }
- if(/你好討厭|你很討厭|你很煩|你態度|你好兇|你很兇|你好機車|不想跟你講|不跟你說了/.test(t)){
-   const p={wenshu:['好，我收一點。妳是在嫌我剛才那句，還是真的不想聊了？'],
-            yanyan:['啊……是我剛才講得不好嗎？如果是，你可以直接跟我說。'],
-            sichuan:['嘖。嫌我就嫌我，別直接跑。是我剛才哪句惹你？']};return say(p[id]);
- }
-
- // Stateful booking conversation.
- if(st.topic==='booking'){
-   if(st.waiting==='date'){
-     if(/\d{1,2}[\/\-月]\d{1,2}|今天|明天|後天|週[一二三四五六日天]|星期[一二三四五六日天]/.test(t)){
-       set('booking','time',{date:cleanAnswer(t)});
-       return id==='sichuan'?`${cleanAnswer(t)}。幾點？`:id==='wenshu'?`${cleanAnswer(t)}。想約幾點？`:`${cleanAnswer(t)}可以，那你想約幾點？`;
-     }
-     return id==='sichuan'?'日期。先講哪一天。':id==='wenshu'?'先給我日期，我再跟妳確認時間。':'先告訴我哪一天，我們再看時間。';
-   }
-   if(st.waiting==='time'){
-     if(/\d{1,2}[:：點時]|\b\d{1,2}\b|早上|上午|中午|下午|晚上|傍晚/.test(t)){
-       const d=st.data?.date||'那天',tm=cleanAnswer(t);set('booking','confirm',{date:d,time:tm});
-       return id==='sichuan'?`${d}，${tm}。這樣？`:id==='wenshu'?`好，${d}、${tm}。日期跟時間都確定？`:`好～${d}、${tm}。這樣對嗎？`;
-     }
-     return id==='sichuan'?'時間。幾點？':id==='wenshu'?'再給我時間。':'那幾點比較方便？';
-   }
-   if(st.waiting==='confirm'){
-     if(/^(好|可以|對|確定|嗯|恩|ok|OK|是)$/.test(t)){let d=st.data?.date,tm=st.data?.time;reset();return id==='sichuan'?`行，${d} ${tm}。記得去預約頁把資料送出去。`:id==='wenshu'?`好，${d} ${tm}。聊天裡先幫妳確認到這裡，正式預約還是要到預約頁送出。`:`好，那就是 ${d} ${tm}。記得再到預約頁完成預約喔。`;}
-     if(/不|改|不是/.test(t)){set('booking','date',{});return id==='sichuan'?'行，重來。哪天？':id==='wenshu'?'好，那重新確認。妳想約哪一天？':'沒問題，那我們重選。你想哪一天？';}
-   }
- }
-
- // Stateful food conversation.
- if(st.topic==='food'){
-   if(st.waiting==='ate'){
-     if(/^(沒有|沒|還沒|沒吃|沒有啊|還沒有)/.test(t)){set('food','choice',{});return id==='sichuan'?'難怪。那你現在想吃什麼？':id==='wenshu'?'難怪會餓。那妳現在想吃什麼？':'難怪會餓呀。那你現在想吃什麼？';}
-     if(/有|吃了|吃過/.test(t)){reset();return id==='sichuan'?'吃過還餓？你剛剛吃多少。':id==='wenshu'?'吃過還餓的話，剛才是不是沒吃多少？':'吃過還餓嗎？你剛剛是不是吃得比較少？';}
-   }
-   if(st.waiting==='choice'){
-     if(t.length<=20 && !/[?？]/.test(t)){
-       let food=cleanAnswer(t).replace(/^我想吃/,'');set('food','afterChoice',{food});
-       return id==='sichuan'?`${food}？可以。你是要把它當正餐，還是只是嘴饞？`:id==='wenshu'?`${food}可以。只是如果妳真的很餓，最好再配點能當正餐的。`:`${food}可以呀。你如果真的很餓，要不要再配一點正餐？`;
-     }
-   }
-   if(st.waiting==='afterChoice'){
-     if(/不想|不要|就想|只想/.test(t)){reset();return id==='sichuan'?'行，你高興。至少真的去吃，別十分鐘後又跟我喊餓。':id==='wenshu'?'好，不逼妳。那至少先吃一點，別一直空著肚子。':'好，那就先吃你想吃的。至少不要一直餓著。';}
-   }
- }
-
- // Stateful emotional conversation.
- if(st.topic==='emotion'){
-   if(st.waiting==='reason'){
-     if(/不知道|沒什麼|說不上來/.test(t)){set('emotion','support',{});return id==='sichuan'?'不知道就先別硬想。你要我陪你講別的，還是就待著？':id==='wenshu'?'不知道也沒關係。那先不找原因。妳想說點別的，還是讓我陪妳安靜一下？':'不知道也沒關係。那我們先不逼自己找原因。你想聊別的，還是我陪你待一下？';}
-     set('emotion','support',{reason:t});
-     return id==='sichuan'?'嗯，這次有聽懂。然後呢？':id==='wenshu'?'好，我知道妳在難受什麼了。後來呢？':'嗯，我懂了。那後來發生什麼？';
-   }
- }
-
- // Start explicit flows.
- if(/可不可以預約|可以預約嗎|我要預約|想預約|想約你/.test(t)){set('booking','date',{});return id==='sichuan'?'可以。哪天？':id==='wenshu'?'可以。妳想約哪一天？':'可以呀，你想約哪一天？';}
- if(/好餓|很餓|餓死|肚子餓/.test(t)){set('food','ate',{});return id==='sichuan'?'你吃飯了沒？':id==='wenshu'?'先回答我，有沒有吃飯？':'你有吃飯嗎？';}
- if(/心情不好|難過|想哭|不開心|委屈|低落|崩潰/.test(t)){set('emotion','reason',{});return id==='sichuan'?'……好，先不嘴你。怎麼了？':id==='wenshu'?'好，我在。今天發生什麼了？':'我在。怎麼了？你慢慢說。';}
-
- // Normal single-turn intents, with conservative fallback.
- const intent=detectChatIntent(t);
- if(intent!=='fallback' && r[intent]) return say(r[intent]);
- const fallback={
-   wenshu:['我沒完全聽懂妳這句。妳可以再講直接一點，我不想亂猜。','這句我怕理解錯。妳是在問我，還是在跟我說一件事？'],
-   yanyan:['我怕我理解錯了😅 你可以再說清楚一點嗎？','等一下，我想確認一下。你這句是在問我，還是只是想跟我說？'],
-   sichuan:['蛤？這句我沒接懂。講完整一點，我不亂猜。','等一下，你這句前後補一下。不然我回了又要被你罵亂回。']
+ return {text:p.unknown,quick:quickFor('root')};
+}
+function quickReplyFor(id,key){
+ const p=personaLine[id];
+ const map={
+  mood:()=>({text:p.mood,quick:quickFor('mood')}),
+  listen:()=>({text:p.listen,quick:[['我繼續說','continue'],['我說完了','done'],['給我意見','advice']]}),
+  advice:()=>({text:p.advice,quick:[['我跟你說','continue'],['算了先不講','distract']]}),
+  distract:()=>({text:p.distract,quick:[['聊吃的','food'],['隨便聊聊','idleRandom'],['我要預約','booking']]}),
+  stay:()=>({text:id==='sichuan'?'行。先待著，不逼你講。':id==='wenshu'?'好。那就先待著，不用說什麼。':'好呀，我先陪你待一下。',quick:[['想說了','listen'],['換個話題','distract']]}),
+  food:()=>({text:p.food,quick:quickFor('food')}),
+  foodPick:()=>({text:id==='sichuan'?'飯、麵、炸的。三個選一個。':id==='wenshu'?'那我幫妳縮小範圍：飯、麵，還是想吃炸的？':'那我幫你選～飯、麵、還是炸的？',quick:[['飯','foodRice'],['麵','foodNoodle'],['炸的','foodFried']]}),
+  foodSelf:()=>({text:id==='sichuan'?'行，選好了記得真的去吃。':id==='wenshu'?'好，選好就去吃，別一直餓著。':'好～選好記得真的去吃喔。'}),
+  foodNo:()=>({text:id==='sichuan'?'不吃也行，等等餓到脾氣差別怪我。':id==='wenshu'?'不太想吃也至少喝點東西，別一直空腹。':'不想吃的話至少喝點東西，好嗎？'}),
+  foodRice:()=>({text:id==='sichuan'?'那就吃飯。別再選半天。':id==='wenshu'?'那就吃飯。想清淡一點還是重口味？':'那吃飯～想清淡的還是重口味？'}),
+  foodNoodle:()=>({text:id==='sichuan'?'麵。可以，去找一家近的。':id==='wenshu'?'那就麵。湯麵或乾麵，看妳現在比較想吃哪種。':'麵可以呀～湯的還是乾的？'}),
+  foodFried:()=>({text:id==='sichuan'?'我就知道。去吃，至少再配個飲料。':id==='wenshu'?'可以，但別只拿一小份薯條當正餐。':'可以～但不要只吃一點點就算一餐喔。'}),
+  idle:()=>({text:p.idle,quick:quickFor('idle')}),
+  idleChat:()=>({text:id==='sichuan'?'行。你最近有什麼事一直掛在腦子裡？':id==='wenshu'?'好。最近有沒有哪件事一直放在心上？':'好呀～最近有什麼事情一直在你腦袋裡？'}),
+  idleDo:()=>({text:id==='sichuan'?'去洗澡、找東西吃、看一集劇。挑一個。':id==='wenshu'?'可以找件不用動太多腦的事：洗澡、散步，或看一集喜歡的東西。':'那找個輕鬆的～散步、洗澡、看一集劇，選一個？'}),
+  idleRandom:()=>({text:id==='sichuan'?'那我問。最近最想買但一直沒買的是什麼？':id==='wenshu'?'那隨便聊。最近有沒有什麼東西，是妳一直想買卻還沒下手的？':'那我隨便問一題～最近有沒有一直想買但還沒買的東西？'}),
+  sleep:()=>({text:p.sleep,quick:quickFor('sleep')}),
+  sleepThink:()=>({text:id==='sichuan'?'那就別逼自己睡。腦子裡最吵的那件事是什麼？':id==='wenshu'?'那先別逼自己立刻睡。腦子裡現在最放不下的是哪件事？':'那先不要逼自己睡。現在腦袋裡一直轉的是什麼？'}),
+  sleepAwake:()=>({text:id==='sichuan'?'那就晚點睡。別躺著硬耗。':id==='wenshu'?'那就先起來做點安靜的事，等真的有睡意再躺。':'那先不要硬睡～做點安靜的事，睏了再回床上。'}),
+  love:()=>({text:p.love,quick:quickFor('love')}),
+  work:()=>({text:p.work,quick:quickFor('work')}),
+  booking:()=>({text:id==='sichuan'?'行，直接選日期。':id==='wenshu'?'可以，直接看看可預約日期。':'可以呀，直接選日期吧～',action:'booking',label:'查看可預約日期'}),
+  continue:()=>({text:id==='sichuan'?'嗯，講。':id==='wenshu'?'好，妳繼續。':'嗯嗯，你繼續。'}),
+  done:()=>({text:id==='sichuan'?'行。那先到這。':id==='wenshu'?'好。說完就先休息一下。':'好～那先讓自己休息一下。'})
  };
- return say(fallback[id]);
+ return (map[key]||(()=>({text:p.unknown,quick:quickFor('root')})))();
 }
 
 function chatKey(id){return 'side-chat-'+id}
@@ -247,8 +258,28 @@ function getChat(id){return JSON.parse(localStorage.getItem(chatKey(id))||'[]')}
 function saveChat(id,a){localStorage.setItem(chatKey(id),JSON.stringify(a))}
 function openChat(id){chatProfileId=id;markChatRead(id);const p=profiles[id];$('#chatAvatar').src=p.img;$('#chatName').textContent=p.name;$('#chatStatus').textContent='通常 '+p.reply.replace('通常於','') ;renderChat();$('#chatModal').classList.add('open');$('#chatModal').setAttribute('aria-hidden','false');setTimeout(()=>$('#chatInput').focus(),250)}
 function closeChat(){clearTimeout(typingTimer);$('#chatTyping').classList.remove('show');$('#chatModal').classList.remove('open');$('#chatModal').setAttribute('aria-hidden','true');updateUnreadBadge();}
-function renderChat(){if(!chatProfileId)return;const a=getChat(chatProfileId), box=$('#chatMessages');box.innerHTML=a.length?a.map(m=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。</div>`;box.scrollTop=box.scrollHeight}
-function sendChat(){if(!chatProfileId)return;const id=chatProfileId,input=$('#chatInput'),text=input.value.trim();if(!text)return;const a=getChat(id),now=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});a.push({from:'me',text,time:now,ts:Date.now()});saveChat(id,a);input.value='';renderChat();$('#chatTyping').classList.add('show');const delay=900+Math.floor(Math.random()*1300);typingTimer=setTimeout(()=>{const b=getChat(id);b.push({from:'them',text:replyFor(id,text),time:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),ts:Date.now()});saveChat(id,b);if(chatProfileId===id && $('#chatModal').classList.contains('open')){markChatRead(id);$('#chatTyping').classList.remove('show');renderChat()}else{setChatUnread(id,true);updateUnreadBadge()}renderConversations()},delay)}
+function renderChat(){
+ if(!chatProfileId)return;
+ const a=getChat(chatProfileId),box=$('#chatMessages');
+ box.innerHTML=a.length?a.map((m,i)=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}${m.action?`<button class="chatAction" data-action="${m.action}">${escapeHTML(m.label||'前往')}</button>`:''}${m.quick&&m.quick.length?`<div class="quickReplies">${m.quick.map(q=>`<button data-quick="${escapeHTML(q[1])}">${escapeHTML(q[0])}</button>`).join('')}</div>`:''}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。<div class="quickReplies rootQuick">${quickFor('root').map(q=>`<button data-quick="${q[1]}">${q[0]}</button>`).join('')}</div></div>`;
+ $$('.chatAction',box).forEach(b=>b.onclick=()=>{if(b.dataset.action==='booking'){const id=chatProfileId;closeChat();setTimeout(()=>openBooking(id),180)}});
+ $$('.quickReplies button',box).forEach(b=>b.onclick=()=>sendQuickReply(b.dataset.quick,b.textContent));
+ box.scrollTop=box.scrollHeight;
+}
+function appendBotReply(id,obj){
+ const b=getChat(id);b.push({from:'them',text:obj.text,action:obj.action||'',label:obj.label||'',quick:obj.quick||[],time:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),ts:Date.now()});saveChat(id,b);
+ if(chatProfileId===id&&$('#chatModal').classList.contains('open')){markChatRead(id);$('#chatTyping').classList.remove('show');renderChat()}else{setChatUnread(id,true);updateUnreadBadge()}renderConversations();
+}
+function sendQuickReply(key,label){
+ if(!chatProfileId)return;const id=chatProfileId,a=getChat(id),now=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+ a.push({from:'me',text:label,time:now,ts:Date.now()});saveChat(id,a);renderChat();$('#chatTyping').classList.add('show');
+ setTimeout(()=>appendBotReply(id,quickReplyFor(id,key)),500+Math.floor(Math.random()*450));
+}
+function sendChat(){
+ if(!chatProfileId)return;const id=chatProfileId,input=$('#chatInput'),text=input.value.trim();if(!text)return;
+ const a=getChat(id),now=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});a.push({from:'me',text,time:now,ts:Date.now()});saveChat(id,a);input.value='';renderChat();$('#chatTyping').classList.add('show');
+ setTimeout(()=>appendBotReply(id,replyFor(id,text)),650+Math.floor(Math.random()*550));
+}
 
 renderCards(); let initial=location.hash.slice(1); if(['search','ranking','records','messages','account'].includes(initial))go(initial); updateUnreadBadge();
 
@@ -303,3 +334,5 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE BUILD v14: fix reply history/current-message ordering
 
 // SIDE BUILD v15: RIGHT swipe = pin(left reveal), LEFT swipe = delete(right reveal)
+
+// SIDE BUILD v17 bounded dialogue tree + quick replies + booking CTA

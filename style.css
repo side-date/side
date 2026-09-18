@@ -90,3 +90,11 @@ nav button[data-go="messages"]{position:relative}
   color:#fff!important;
   z-index:1!important;
 }
+
+/* SIDE v17 — bounded dialogue tree */
+.quickReplies{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px}
+.quickReplies button,.chatAction{border:1px solid #cfc2bb;background:#f8f4f1;color:#554b47;padding:9px 12px;font-size:13px;border-radius:18px}
+.chatAction{display:block;width:100%;border-radius:3px;margin:13px 0 4px;font-size:14px}
+.quickReplies button:active,.chatAction:active{transform:scale(.98);background:#eee6e1}
+.rootQuick{margin-top:16px}
+.chatWelcome .quickReplies{justify-content:center}
