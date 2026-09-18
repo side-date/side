@@ -102,49 +102,30 @@ function chooseFresh(id,choices){const recent=recentBotTexts(id,8);const fresh=c
 function eventReply(id,text){
  const t=String(text).trim(), v=personaVoice[id], s=getChatState(id), mem=s.memory||{};
  const say=(w,y,sc)=>chooseFresh(id,[id==='wenshu'?w:id==='yanyan'?y:sc]);
- // 0. 功能：預約永遠優先，且是唯一會產生按鈕的聊天事件。
+ const last=getChat(id).slice(-6), lastBot=[...last].reverse().find(m=>m.from==='them')?.text||'', lastUser=[...last].reverse().find(m=>m.from==='me'&&m.text!==t)?.text||'';
+ const setEvent=(event,step=1,extra={})=>patchState(id,{event,step,...extra});
+ const incidentWords=/被|有人|朋友|同事|主管|老闆|家人|他|她|罵|兇|欺負|吵架|放鳥|拒絕|騙|討厭|生氣|弄|發生|今天/;
+
+ // 功能事件：唯一產生按鈕。
  if(has(t,/預約|我要約|想約你|約見面|可以約嗎|想見面/)){
-   const d=dateText(t); if(d) remember(id,'bookingDate',d);
-   patchState(id,{event:'booking',step:1});
+   const d=dateText(t); if(d) remember(id,'bookingDate',d); setEvent('booking');
    return {text:id==='sichuan'?'可以。日期跟時段直接去預約頁選。':id==='wenshu'?'可以。日期和時段直接到預約頁確認，這樣不會弄錯。':'可以呀～直接到預約頁選日期和時段吧。',action:'booking',label:'前往預約'};
  }
- // 1. 修復事件：使用者在抱怨 NPC 的上一則回覆時，立即打斷任何舊話題。
+
+ // 對「上一則回覆」的反應，優先級最高。
+ if(has(t,/^[？?]+$/)){
+   setEvent('repair');
+   return {text:id==='sichuan'?'……對，我剛剛那句接得很蠢。你前面是在說你被罵之後很不爽，我有聽懂。':id==='wenshu'?'是我剛剛接得不對。妳前面的意思其實很清楚，我不該又把問題丟回給妳。':'啊，我剛剛那句接得很怪。你前面的意思其實很清楚，是我沒接好。'};
+ }
  if(has(t,/怎麼(都|一直).*回.*一樣|每次.*一樣|你(根本)?沒在聽|亂回|亂講|答非所問|已讀亂回|很敷衍|回覆.*(爛|差)|你在講什麼|接錯|理解錯|態度.*(差|糟)/)){
-   patchState(id,{event:'repair',step:1});
-   return {text:id==='sichuan'?'……行，被你抓到了。剛剛我確實卡在同一句。你現在這句我重新接，不沿用前面的話題。':id==='wenshu'?'妳說得對，剛剛我的回答重複了。我先把前面的話題停掉，從妳現在這句重新接。':'你說得對，我剛剛真的一直重複同一種回答。抱歉，我把前面的話題停掉，從你現在這句重新來。'};
+   setEvent('repair');
+   return {text:id==='sichuan'?'……行，剛剛是我接爛了。你前面那件事我沒忘，別重講。':id==='wenshu'?'妳說得對，剛剛是我沒有接住前文。前面的事不用重講，我還記得。':'你說得對，剛剛是我沒有接住前文。前面的事情不用重講，我記得。'};
  }
- // 2. 明確的新意圖永遠可以打斷舊事件。這是 v22 的核心修正。
- if(has(t,/好餓|很餓|餓死|肚子餓|我餓了/)){
-   patchState(id,{event:'food',step:1});
-   return {text:id==='sichuan'?'餓就先吃。你今天有吃正餐沒？':id==='wenshu'?'那先處理肚子。妳今天有吃正餐嗎？':'那先不要餓著啦～你今天有吃正餐嗎？'};
- }
- if(has(t,/我需要你陪|陪陪我|陪我一下|陪著我|想要你陪/)){
-   patchState(id,{event:'company',step:1});
-   return {text:id==='sichuan'?'行，我在。你不想講原因也不用硬講。':id==='wenshu'?'好，我陪妳。現在不想說原因也沒關係。':'好呀，我陪你。你現在不想說原因也沒關係。'};
- }
- if(has(t,/無聊|好無聊/)){
-   patchState(id,{event:'idle',step:1});
-   return {text:id==='sichuan'?'無聊？那聊啊。你想聊今天的事，還是要我開題？':id==='wenshu'?'那陪妳聊一會。妳想說今天的事，還是要我開個話題？':'那我陪你聊呀～你想聊今天的事，還是要我開題？'};
- }
- if(has(t,/睡不著|失眠|不睏|不困/)){
-   patchState(id,{event:'sleep',step:1});
-   return {text:id==='sichuan'?'睡不著？腦子太吵，還是單純不睏？':id==='wenshu'?'睡不著？是腦子停不下來，還是單純沒有睡意？':'睡不著嗎？是一直在想事情，還是單純不睏？'};
- }
- if(has(t,/心情不好|不開心|難過|想哭|委屈|低落|很煩|今天不好/)){
-   patchState(id,{event:'mood',step:1});
-   return {text:id==='sichuan'?'……行，今天先不嘴你。怎麼了？':id==='wenshu'?'好，我在。今天發生什麼了？':'我在。今天怎麼了？'};
- }
- if(has(t,/失戀|分手|前任|感情|曖昧|男友|女友|喜歡的人/)){
-   patchState(id,{event:'love',step:1});
-   return {text:id==='sichuan'?'感情喔。行，先講發生什麼。':id==='wenshu'?'感情的事可以說。先告訴我發生什麼。':'可以說呀。先告訴我發生什麼了。'};
- }
- if(has(t,/工作|上班|加班|主管|老闆|同事|好累|很累/)){
-   patchState(id,{event:'work',step:1});
-   return {text:id==='sichuan'?'工作又怎樣了？挑最煩的那件講。':id==='wenshu'?'工作把妳耗到了？先說今天最煩的那一件。':'工作很累嗎？先跟我說今天最煩的那件事。'};
- }
- // 3. 對角色的直接提問也優先於舊事件，避免被 mood/food 狀態吞掉。
+
+ // 明確換話題／直接問角色本人，可中斷任何事件。
+ if(has(t,/換個話題|不聊這個|先不說這個|算了不講/)){setEvent('idle');return {text:id==='sichuan'?'行，換。你想問我還是我開題？':id==='wenshu'?'好，那就換一個。妳想問我，還是我開個話題？':'好呀，那換一個～你想問我，還是我來開題？'};}
  if(has(t,/你(今天)?有(發生)?什麼.*(有趣|好玩)|你今天.*(幹嘛|做什麼|怎樣)|今天有趣/)){
-   patchState(id,{event:'character_day',step:1});
+   setEvent('character_day');
    const pools={
     wenshu:['下午買咖啡時，前面的人拿錯我的杯子，喝了一口才發現。最後他比我還尷尬。','今天其實很普通。比較好笑的是有人進電梯後按了半天關門鍵，最後才發現那是開門鍵。','路上看到一個小孩很認真跟路邊的鴿子談判，講了快五分鐘。算今天比較有趣的事。'],
     yanyan:['今天路上看到一隻狗自己叼著牽繩往前跑，主人在後面追了半條街，我差點笑出來。','下午買飲料時店員把我的名字寫得完全不一樣，我盯著那杯看了好久才敢拿。','今天看到一隻貓坐在機車座墊上，車主站旁邊等牠讓位，最後還是貓贏了。'],
@@ -153,7 +134,38 @@ function eventReply(id,text){
  }
  if(has(t,/你在幹嘛|你在做什麼|你現在幹嘛/)) return {text:id==='sichuan'?'現在？回你訊息。還能幹嘛。':id==='wenshu'?'現在在回妳訊息。手邊的事剛好告一段落。':'現在在回你呀～剛好手邊沒什麼事。'};
  if(has(t,/你吃(飯|東西)了嗎|你吃了嗎/)) return {text:id==='sichuan'?'吃了。你先管好你自己有沒有吃。':id==='wenshu'?'吃過了。倒是妳，別只顧著問我。':'吃過啦～你呢？有好好吃嗎？'};
- // 4. 延續目前事件，但只處理真正屬於該事件的句子。
+
+ // 明確新主題，可中斷舊狀態。
+ if(has(t,/好餓|很餓|餓死|肚子餓|我餓了/)){setEvent('food');return {text:id==='sichuan'?'餓就先吃。你今天有吃正餐沒？':id==='wenshu'?'那先處理肚子。妳今天有吃正餐嗎？':'那先不要餓著啦～你今天有吃正餐嗎？'};}
+ if(has(t,/我需要你陪|陪陪我|陪我一下|陪著我|想要你陪/)){setEvent('company');return {text:id==='sichuan'?'行，我在。你不想講原因也不用硬講。':id==='wenshu'?'好，我陪妳。現在不想說原因也沒關係。':'好呀，我陪你。你現在不想說原因也沒關係。'};}
+ if(has(t,/無聊|好無聊/)){setEvent('idle');return {text:id==='sichuan'?'無聊？那聊啊。你想聊今天的事，還是要我開題？':id==='wenshu'?'那陪妳聊一會。妳想說今天的事，還是要我開個話題？':'那我陪你聊呀～你想聊今天的事，還是要我開題？'};}
+ if(has(t,/睡不著|失眠|不睏|不困/)){setEvent('sleep');return {text:id==='sichuan'?'睡不著？腦子太吵，還是單純不睏？':id==='wenshu'?'睡不著？是腦子停不下來，還是單純沒有睡意？':'睡不著嗎？是一直在想事情，還是單純不睏？'};}
+ if(has(t,/心情不好|不開心|難過|想哭|委屈|低落|很煩|今天不好/)&&!incidentWords.test(t)){setEvent('mood');return {text:id==='sichuan'?'……行，今天先不嘴你。怎麼了？':id==='wenshu'?'好，我在。今天發生什麼了？':'我在。今天怎麼了？'};}
+ if(has(t,/失戀|分手|前任|感情|曖昧|男友|女友|喜歡的人/)){setEvent('love');return {text:id==='sichuan'?'感情喔。行，先講發生什麼。':id==='wenshu'?'感情的事可以說。先告訴我發生什麼。':'可以說呀。先告訴我發生什麼了。'};}
+ if(has(t,/工作|上班|加班|主管|老闆|同事|好累|很累/)){setEvent('work');return {text:id==='sichuan'?'工作又怎樣了？挑最煩的那件講。':id==='wenshu'?'工作把妳耗到了？先說今天最煩的那一件。':'工作很累嗎？先跟我說今天最煩的那件事。'};}
+
+ // 敘述「發生了什麼」：保存整件事，而不是只存 mood 標籤。
+ if(incidentWords.test(t) && t.length>=4 && !has(t,/你今天|你有/)){
+   const old=s.incident||''; const incident=old ? (old+'；'+t) : t;
+   setEvent('incident',1,{incident});
+   if(has(t,/罵我|被罵|兇我|被兇/)) return {text:id==='sichuan'?'誰罵你？因為什麼？':id==='wenshu'?'有人罵妳？是誰，發生什麼事了？':'有人罵你嗎？是誰呀，發生什麼事了？'};
+   if(has(t,/吵架|吵了一架/)) return {text:id==='sichuan'?'跟誰吵？吵什麼？':id==='wenshu'?'跟誰吵起來了？事情是怎麼開始的？':'跟誰吵架了？怎麼開始的呀？'};
+   return {text:id==='sichuan'?'嗯，這件事我記著。後來呢？':id==='wenshu'?'嗯，我跟上了。後來發生什麼？':'嗯，我有跟上。後來呢？'};
+ }
+
+ // 事件後的情緒結果：必須回到已保存的事件，而不是重複「然後呢」。
+ if((s.event==='incident'||s.incident) && has(t,/不開心|難過|生氣|很氣|委屈|很煩|不爽|想哭|心情.*不好/)){
+   setEvent('incident_feeling',2,{incident:s.incident||''});
+   if(has(s.incident||'',/罵我|被罵|兇我|被兇/)) return {text:id==='sichuan'?'廢話，被人那樣講當然會不爽。對方到底憑什麼罵你？':id==='wenshu'?'被人那樣對待，妳不開心很正常。對方是因為什麼罵妳？':'被人那樣罵，當然會不開心。對方為什麼罵你呀？'};
+   return {text:id==='sichuan'?'嗯，難怪你心情差。是那件事哪一段最讓你不爽？':id==='wenshu'?'嗯，我明白了。是那件事裡哪一部分最讓妳難受？':'嗯，我懂了。那件事裡最讓你難受的是哪一部分？'};
+ }
+
+ // 延續具體事件：使用者補充原因／人物／細節。
+ if(s.event==='incident'||s.event==='incident_feeling'){
+   if(t.length>=3){setEvent('incident',Math.min((s.step||1)+1,5),{incident:(s.incident||'')+'；'+t});return {text:id==='sichuan'?'嗯，這樣就說得通了。那你當下有回他嗎？':id==='wenshu'?'我知道了。那妳當下有回應對方嗎？':'我懂了。那你當下有回他嗎？'};}
+ }
+
+ // 各主題內的真正延續。
  if(s.event==='food'){
    if(has(t,/^(沒有|沒|還沒)[。！! ]*$/)||has(t,/沒吃|還沒吃/)) return {text:id==='sichuan'?'難怪。那你現在想吃飯、麵，還是炸的？':id==='wenshu'?'難怪會餓。妳現在比較想吃飯、麵，還是炸的？':'難怪會餓～你現在想吃飯、麵，還是炸的？'};
    if(has(t,/薯條|炸物|雞排|鹽酥雞/)){remember(id,'food','炸物');return {text:id==='sichuan'?'薯條可以，但真餓的話那點東西撐不了多久。配個漢堡或雞肉。':id==='wenshu'?'薯條可以，但如果是真的餓，只有薯條可能不太夠。可以再配一份正餐。':'薯條可以呀～但真的很餓的話，再配個漢堡或雞肉會比較夠。'};}
@@ -162,7 +174,6 @@ function eventReply(id,text){
  if(s.event==='mood'||s.event==='company'){
    if(has(t,/下雨|雨天|雨/)){remember(id,'moodCause','下雨');return {text:id==='sichuan'?'原來是下雨。你是討厭濕答答，還是雨天本身就讓你煩？':id==='wenshu'?'原來是下雨。是出門變麻煩，還是雨天本身就會讓妳心情往下掉？':'原來是下雨呀。你是不喜歡濕答答的感覺，還是雨天本身就會讓你比較悶？'};}
    if(has(t,/不知道|沒原因|莫名/)) return {text:id==='sichuan'?'不知道就先不知道。心情差又不用交報告。':id==='wenshu'?'不知道也沒關係，不需要現在硬找原因。':'不知道也沒關係呀，不用逼自己現在找答案。'};
-   if(has(t,/不想講|不想說|算了/)){patchState(id,{event:'idle',step:1});return {text:id==='sichuan'?'行，不逼你。那換個東西聊。':id==='wenshu'?'好，那就先不講。我們換個輕鬆一點的。':'好，那先不講也沒關係。我們換個輕鬆的。'};}
  }
  if(s.event==='idle'){
    if(has(t,/跟你聊|聊天/)) return {text:id==='sichuan'?'行啊。那我問，你最近有沒有一件明明很小、但一直記著的事？':id==='wenshu'?'可以。最近有沒有一件很小、但妳一直記著的事？':'好呀～最近有沒有一件很小、但你一直記著的事？'};
@@ -170,16 +181,26 @@ function eventReply(id,text){
  }
  if(s.event==='work'&&has(t,/主管|老闆|同事/)) return {text:id==='sichuan'?'又是人比工作煩。具體幹嘛了？':id==='wenshu'?'聽起來真正耗妳的可能不是工作量，是人。對方做了什麼？':'聽起來累你的不只是工作，是人。對方做了什麼呀？'};
  if(s.event==='sleep'&&has(t,/想很多|腦袋|停不下來|一直想/)) return {text:id==='sichuan'?'那別硬睡。腦子裡最吵的那件事先丟給我。':id==='wenshu'?'那先別逼自己睡。腦子裡最放不下的那件事可以先說給我聽。':'那先不要逼自己睡。腦袋裡最吵的那件事先跟我說。'};
- // 5. 短句只在上下文明確時承接。
- if(has(t,/^(對|嗯|恩|是|沒錯|真的)[。！! ]*$/)) return {text:id==='sichuan'?'嗯。然後？':id==='wenshu'?'嗯，我知道了。妳接著說。':'嗯嗯，我知道了。你接著說。'};
+
+ // 短回答要看上一句，而不是一律「接著說」。
+ if(has(t,/^(對|嗯|恩|是|沒錯|真的)[。！! ]*$/)){
+   if(/有吃正餐|吃正餐嗎/.test(lastBot)) return {text:id==='sichuan'?'那還行。現在只是嘴饞？':id==='wenshu'?'那至少有吃正餐。現在是又餓了，還是只是想吃點東西？':'那至少有吃正餐～現在是又餓了，還是嘴饞呀？'};
+   return {text:id==='sichuan'?'嗯，我知道。':id==='wenshu'?'嗯，我知道了。':'嗯嗯，我知道了。'};
+ }
  if(has(t,/^(不知道|不確定)[。！! ]*$/)) return {text:id==='sichuan'?'不知道就先不知道。':id==='wenshu'?'不知道也沒關係。':'不知道也沒關係呀。'};
- if(has(t,/^(嗨|哈囉|hi|hello|在嗎|你好|欸|喂)[!！?？。 ]*$/i)){patchState(id,{event:'hello',step:1});return {text:v.greet};}
- // 6. 真正無法辨識時不再用「我有在聽」固定句，且避免最近回覆重複。
- const fallbacks={
-  wenshu:['我有看到妳這句。妳想從這裡繼續聊，我跟著妳。','這句我不想亂替妳解讀。妳可以直接告訴我妳現在最在意哪一部分。','嗯。這次我先不替妳下結論，妳照自己的方式說就好。'],
-  yanyan:['我有看到你這句。你想從這裡繼續聊，我跟著你。','這句我怕自己理解偏掉。你可以直接說你現在最在意哪一部分。','嗯，我先不幫你下結論。你照你想說的方式講就好。'],
-  sichuan:['這句我先不亂猜。你要講哪個點就直接講。','行，我看到這句了。你接著你真正想講的。','我不硬接。你要問我、吐槽我，還是講你的事，直接來。']};
- return {text:chooseFresh(id,fallbacks[id])};
+ if(has(t,/^(嗨|哈囉|hi|hello|在嗎|你好|欸|喂)[!！?？。 ]*$/i)){setEvent('hello');return {text:v.greet};}
+
+ // 最後 fallback：依「問句 / 陳述」分流，且避免最近 8 句重複。
+ const qmark=/[？?]$/.test(t)||/^(為什麼|怎麼|什麼|哪|誰|可以|能不能|要不要|你覺得)/.test(t);
+ const pools=qmark?{
+   wenshu:['妳是在問我的看法嗎？如果是，我可以直接回答。','這題我可以接。妳想問的是哪一部分？','我先照字面回答，不替妳多猜。'],
+   yanyan:['你是在問我的想法嗎？如果是，我可以直接說。','這題我可以接～你最想問的是哪一部分？','我先照你這句的字面回答，不亂猜你沒說的。'],
+   sichuan:['你是在問我？行，問題講完整，我直接答。','這題可以。你要問哪個點？','我先照字面回，省得又被你說亂猜。']
+ }:{
+   wenshu:['嗯，我有跟上這句。','我知道妳現在是在補充，不會把話題重開。','好，這個細節我記住了。'],
+   yanyan:['嗯，我有跟上這句。','我知道你是在補充，我不會把話題重開。','好，這個細節我記住了。'],
+   sichuan:['嗯，這句我跟上了。','行，這個我記著。','知道了，這次沒漏。']};
+ return {text:chooseFresh(id,pools[id])};
 }
 function replyFor(id,text){return eventReply(id,text)}
 
