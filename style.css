@@ -15,3 +15,10 @@
 @keyframes sideLikePop{0%{transform:scale(1)}40%{transform:scale(1.45) rotate(-8deg)}70%{transform:scale(.92) rotate(3deg)}100%{transform:scale(1)}}
 @keyframes sidePlusOne{0%{opacity:0;transform:translateY(3px) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translateY(-22px) scale(1.08)}}
 @media (prefers-reduced-motion:reduce){.likes.pop .likeIcon,.plusOne.float{animation:none}}
+
+/* v7: clearly tappable review-like pill */
+.review .likes{position:relative;z-index:2;min-height:38px;padding:8px 13px;margin-top:8px;border:1px solid #e2d8d3;border-radius:999px;background:#fbf8f6;color:#8d817b;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-appearance:none;appearance:none}
+.review .likes:active{transform:scale(.96)}
+.review .likes.liked{background:#eee4e0;border-color:#cbb7af;color:#6f554e;font-weight:700}
+.review .likes .likeIcon{font-size:15px}
+.review .likes .plusOne{left:20px;top:-4px}
