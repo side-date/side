@@ -63,8 +63,8 @@ function bindSwipeRow(row){
  surface.addEventListener('touchstart',e=>{let t=e.touches[0];sx=t.clientX;sy=t.clientY;dx=0;drag=false;surface.style.transition='none'},{passive:true});
  surface.addEventListener('touchmove',e=>{let t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;if(Math.abs(x)>8&&Math.abs(x)>Math.abs(y)){drag=true;dx=Math.max(-104,Math.min(104,x));surface.style.transform=`translateX(${dx}px)`}},{passive:true});
  surface.addEventListener('touchend',()=>{surface.style.transition='transform .2s ease';suppressClick=drag;
-   if(dx>=55){surface.style.transform='translateX(104px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else surface.style.transform='translateX(0)'},80)}
-   else if(dx<=-55){surface.style.transform='translateX(-104px)';setTimeout(()=>{let on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},80)}
+   if(dx<=-55){surface.style.transform='translateX(-104px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));clearChatState(id);setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else surface.style.transform='translateX(0)'},80)}
+   else if(dx>=55){surface.style.transform='translateX(104px)';setTimeout(()=>{let on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},80)}
    else surface.style.transform='translateX(0)';
    setTimeout(()=>suppressClick=false,250);
  });
@@ -151,96 +151,95 @@ function pickReply(pool,history){
 }
 function recentUser(history){return [...history].reverse().find(m=>m.from==='me')}
 function recentBot(history){return [...history].reverse().find(m=>m.from==='them')}
+function stateKey(id){return `side-chat-state-${id}`}
+function getChatState(id){try{return JSON.parse(localStorage.getItem(stateKey(id))||'{}')}catch(e){return {}}}
+function saveChatState(id,s){localStorage.setItem(stateKey(id),JSON.stringify(s))}
+function clearChatState(id){localStorage.removeItem(stateKey(id))}
+function cleanAnswer(t){return String(t).trim().replace(/[。！？!?]+$/,'')}
+
 function replyFor(id,text){
-  const history=getChat(id), t=String(text).trim(), r=chatReplies[id];
-  const prevUser=recentUser(history.filter(m=>m.text!==text));
-  const prevBot=recentBot(history);
-  const intent=detectChatIntent(t);
+ const history=getChat(id),t=String(text).trim(),r=chatReplies[id],st=getChatState(id);
+ const prevBot=[...history].reverse().find(m=>m.from==='them');
+ const say=p=>pickReply(p,history);
+ const set=(topic,waiting,data={})=>saveChatState(id,{topic,waiting,data,updated:Date.now()});
+ const reset=()=>clearChatState(id);
 
-  // Follow the immediately previous character question before doing generic intent matching.
-  if(prevBot){
-    const q=prevBot.text||'';
-    if(/有沒有吃飯|有吃飯|吃了嗎/.test(q)){
-      if(/^(沒有|沒|還沒|沒有啊|沒吃|還沒有)[!！?？。 ]*$/.test(t)){
-        const pools={
-          wenshu:['那先去吃。妳現在想吃什麼？我幫妳挑，不准再回我「隨便」。','難怪會餓。先想一個最想吃的，飯、麵，還是炸的？'],
-          yanyan:['那難怪會餓呀。你現在最想吃什麼？飯、麵，還是想吃點炸的？','還沒吃喔？那我們先想吃什麼，不然等等更餓。'],
-          sichuan:['那你喊餓不是廢話嗎。想吃什麼？我幫你排除難吃的。','沒吃還說好餓。行，現在想吃飯、麵，還是垃圾食物？']
-        };return pickReply(pools[id],history);
-      }
-      if(/薯條|炸雞|漢堡|披薩|pizza|拉麵|火鍋|壽司|飯|麵|牛排|雞排|鹽酥雞|甜點|蛋糕|飲料|奶茶/.test(t)){
-        const pools={
-          wenshu:[`可以，${t.replace(/^我想吃/,'')}。但別只吃一點點就算一餐。`,`想吃${t.replace(/^我想吃/,'')}就去吃。妳都餓了，別再拖。`],
-          yanyan:[`好呀，那就吃${t.replace(/^我想吃/,'')}～你剛剛都說餓了，快去吃。`,`可以耶。${t.replace(/^我想吃/,'')}聽起來就很適合現在。`],
-          sichuan:[`${t.replace(/^我想吃/,'')}？行啊，至少這次不是回我「隨便」。`,`可以。去吃${t.replace(/^我想吃/,'')}，不要等一下又餓到脾氣差。`]
-        };return pickReply(pools[id],history);
-      }
-    }
-    if(/想吃什麼/.test(q) && /薯條|炸雞|漢堡|披薩|pizza|拉麵|火鍋|壽司|飯|麵|牛排|雞排|鹽酥雞|甜點|蛋糕|飲料|奶茶/.test(t)){
-      const food=t.replace(/^我想吃/,'');
-      const pools={
-        wenshu:[`薯條可以，但如果這是正餐，再加點別的。妳不是才說很餓？`,`好，${food}。想吃就吃，別餓著還一直跟我聊天。`],
-        yanyan:[`好呀，${food}～那快去吃，不然越聊越餓了。`,`可以耶。那今天就吃${food}，再配個你喜歡的飲料？`],
-        sichuan:[`${food}喔？可以。至少你終於選了，不是又丟一句隨便給我。`,`行，${food}。快去，不然等等又跟我喊餓。`]
-      };return pickReply(pools[id],history);
-    }
-  }
+ // Meta-reactions always take priority: the user is talking about THIS conversation.
+ if(/亂回|答非所問|你在回什麼|你有沒有在聽|沒在聽|根本沒聽|你沒聽懂/.test(t)){
+   const p={wenshu:['嗯，剛才是我沒接到妳的意思。不要接著猜了，妳把上一句再給我一次，我照那句回。'],
+            yanyan:['對不起，我剛剛真的接錯了。你把剛才那句再說一次，我不自己亂猜。'],
+            sichuan:['……行，剛剛是我亂接。你上一句重講，我這次照著回。']};return say(p[id]);
+ }
+ if(/你好討厭|你很討厭|你很煩|你態度|你好兇|你很兇|你好機車|不想跟你講|不跟你說了/.test(t)){
+   const p={wenshu:['好，我收一點。妳是在嫌我剛才那句，還是真的不想聊了？'],
+            yanyan:['啊……是我剛才講得不好嗎？如果是，你可以直接跟我說。'],
+            sichuan:['嘖。嫌我就嫌我，別直接跑。是我剛才哪句惹你？']};return say(p[id]);
+ }
 
-  // User is reacting to the character's tone / previous reply.
-  if(/你(的)?態度|態度.*糟|你好兇|你很兇|你很冷淡|你很敷衍|你很機車|你很靠北|你很討厭|不想跟你講|不跟你說了|算了.*不說/.test(t)){
-    const pools={
-      wenshu:['好，是我剛才回得太硬了。妳不是來聽我審問的。重新來，妳剛才說心情不好，我聽。','嗯，我知道。剛才那句不好聽。妳如果還願意說，我換個方式聽。'],
-      yanyan:['啊……抱歉，我剛剛那句真的有點像在敷衍你。你不用整理好再說，我會好好聽。','是我剛才沒接好。對不起。你如果還想說，我在。'],
-      sichuan:['……行，我剛剛那句是欠揍了點。不是不想理你。你心情不好就講，我這次不亂嘴。','嘖，好啦，是我態度差。你要是不爽就罵，但別真的不講。']
-    }; return pickReply(pools[id],history);
-  }
+ // Stateful booking conversation.
+ if(st.topic==='booking'){
+   if(st.waiting==='date'){
+     if(/\d{1,2}[\/\-月]\d{1,2}|今天|明天|後天|週[一二三四五六日天]|星期[一二三四五六日天]/.test(t)){
+       set('booking','time',{date:cleanAnswer(t)});
+       return id==='sichuan'?`${cleanAnswer(t)}。幾點？`:id==='wenshu'?`${cleanAnswer(t)}。想約幾點？`:`${cleanAnswer(t)}可以，那你想約幾點？`;
+     }
+     return id==='sichuan'?'日期。先講哪一天。':id==='wenshu'?'先給我日期，我再跟妳確認時間。':'先告訴我哪一天，我們再看時間。';
+   }
+   if(st.waiting==='time'){
+     if(/\d{1,2}[:：點時]|\b\d{1,2}\b|早上|上午|中午|下午|晚上|傍晚/.test(t)){
+       const d=st.data?.date||'那天',tm=cleanAnswer(t);set('booking','confirm',{date:d,time:tm});
+       return id==='sichuan'?`${d}，${tm}。這樣？`:id==='wenshu'?`好，${d}、${tm}。日期跟時間都確定？`:`好～${d}、${tm}。這樣對嗎？`;
+     }
+     return id==='sichuan'?'時間。幾點？':id==='wenshu'?'再給我時間。':'那幾點比較方便？';
+   }
+   if(st.waiting==='confirm'){
+     if(/^(好|可以|對|確定|嗯|恩|ok|OK|是)$/.test(t)){let d=st.data?.date,tm=st.data?.time;reset();return id==='sichuan'?`行，${d} ${tm}。記得去預約頁把資料送出去。`:id==='wenshu'?`好，${d} ${tm}。聊天裡先幫妳確認到這裡，正式預約還是要到預約頁送出。`:`好，那就是 ${d} ${tm}。記得再到預約頁完成預約喔。`;}
+     if(/不|改|不是/.test(t)){set('booking','date',{});return id==='sichuan'?'行，重來。哪天？':id==='wenshu'?'好，那重新確認。妳想約哪一天？':'沒問題，那我們重選。你想哪一天？';}
+   }
+ }
 
-  // Direct sadness should never be converted into a generic "continue".
-  if(intent==='sad'){
-    const pools={
-      wenshu:['怎麼了？先不用急著把原因講得很完整。妳現在比較像是委屈、很累，還是單純什麼都不想碰？','好，我在。心情不好就先說心情不好，不用裝沒事。今天發生什麼了？'],
-      yanyan:['嗯……那今天先不用勉強自己看起來沒事。你想從發生的事情開始說，還是先讓我陪你一下？','我有聽到。你現在不舒服的感覺比較像難過、委屈，還是很煩？'],
-      sichuan:['……好，今天先不嘴你。怎麼了？誰惹你，還是你自己悶了一整天？','行。心情不好就講，不用先想好理由。我在聽。']
-    }; return pickReply(pools[id],history);
-  }
+ // Stateful food conversation.
+ if(st.topic==='food'){
+   if(st.waiting==='ate'){
+     if(/^(沒有|沒|還沒|沒吃|沒有啊|還沒有)/.test(t)){set('food','choice',{});return id==='sichuan'?'難怪。那你現在想吃什麼？':id==='wenshu'?'難怪會餓。那妳現在想吃什麼？':'難怪會餓呀。那你現在想吃什麼？';}
+     if(/有|吃了|吃過/.test(t)){reset();return id==='sichuan'?'吃過還餓？你剛剛吃多少。':id==='wenshu'?'吃過還餓的話，剛才是不是沒吃多少？':'吃過還餓嗎？你剛剛是不是吃得比較少？';}
+   }
+   if(st.waiting==='choice'){
+     if(t.length<=20 && !/[?？]/.test(t)){
+       let food=cleanAnswer(t).replace(/^我想吃/,'');set('food','afterChoice',{food});
+       return id==='sichuan'?`${food}？可以。你是要把它當正餐，還是只是嘴饞？`:id==='wenshu'?`${food}可以。只是如果妳真的很餓，最好再配點能當正餐的。`:`${food}可以呀。你如果真的很餓，要不要再配一點正餐？`;
+     }
+   }
+   if(st.waiting==='afterChoice'){
+     if(/不想|不要|就想|只想/.test(t)){reset();return id==='sichuan'?'行，你高興。至少真的去吃，別十分鐘後又跟我喊餓。':id==='wenshu'?'好，不逼妳。那至少先吃一點，別一直空著肚子。':'好，那就先吃你想吃的。至少不要一直餓著。';}
+   }
+ }
 
-  // Very short replies inherit the last user's topic, but only when that topic is clear.
-  if(t.length<=10 && /^(嗯|恩|對|對啊|是啊|好|好吧|不知道|算了|真的|可是|但是|然後|因為|沒有|沒事)$/.test(t) && prevUser){
-    const prevIntent=detectChatIntent(prevUser.text||'');
-    const follow={
-      wenshu:{
-        sad:['不知道原因也沒關係。那就先別逼自己找答案。妳現在想說話，還是想安靜一下？'],
-        angry:['嗯。先把最讓妳不舒服的那一段留下來，其他的等等再處理。'],
-        tired:['那先別硬撐。妳今天已經夠累了。'],
-        fallback:['嗯。我有跟上。妳接著說。']
-      },
-      yanyan:{
-        sad:['不知道也沒關係，有時候情緒就是會先出現。你不用急著解釋。'],
-        angry:['嗯，我懂。你先把想說的說完，我不急著替任何人找理由。'],
-        tired:['那今天真的辛苦了。先讓自己休息一下也可以。'],
-        fallback:['嗯嗯，我有跟上。你慢慢說。']
-      },
-      sichuan:{
-        sad:['不知道就不知道，幹嘛逼自己現在想出答案。先待著。'],
-        angry:['嗯，這樣聽起來確實很煩。你繼續，我先不插嘴。'],
-        tired:['那就休息。你又不是非得今天把全世界處理完。'],
-        fallback:['嗯，有在聽。你講。']
-      }
-    };
-    return pickReply((follow[id]&&follow[id][prevIntent])||follow[id].fallback,history);
-  }
+ // Stateful emotional conversation.
+ if(st.topic==='emotion'){
+   if(st.waiting==='reason'){
+     if(/不知道|沒什麼|說不上來/.test(t)){set('emotion','support',{});return id==='sichuan'?'不知道就先別硬想。你要我陪你講別的，還是就待著？':id==='wenshu'?'不知道也沒關係。那先不找原因。妳想說點別的，還是讓我陪妳安靜一下？':'不知道也沒關係。那我們先不逼自己找原因。你想聊別的，還是我陪你待一下？';}
+     set('emotion','support',{reason:t});
+     return id==='sichuan'?'嗯，這次有聽懂。然後呢？':id==='wenshu'?'好，我知道妳在難受什麼了。後來呢？':'嗯，我懂了。那後來發生什麼？';
+   }
+ }
 
-  // If user asks "什麼？" after a confusing bot message, clarify instead of changing topic.
-  if(/^(什麼|蛤|蛤？|什麼意思|你在說什麼)[?？ ]*$/.test(t) && prevBot){
-    const pools={
-      wenshu:['我是說，我剛才可能沒接到妳真正想講的。妳照自己的方式說就好。'],
-      yanyan:['我的意思是我剛剛可能理解錯了😅 你照原本想說的繼續就好。'],
-      sichuan:['我是說我剛剛沒接懂。算我的，你重講，我不瞎猜。']
-    }; return pickReply(pools[id],history);
-  }
+ // Start explicit flows.
+ if(/可不可以預約|可以預約嗎|我要預約|想預約|想約你/.test(t)){set('booking','date',{});return id==='sichuan'?'可以。哪一天？':id==='wenshu'?'可以。妳想約哪一天？':'可以呀，你想約哪一天？';}
+ if(/好餓|很餓|餓死|肚子餓/.test(t)){set('food','ate',{});return id==='sichuan'?'你吃飯了沒？':id==='wenshu'?'先回答我，有沒有吃飯？':'你有吃飯嗎？';}
+ if(/心情不好|難過|想哭|不開心|委屈|低落|崩潰/.test(t)){set('emotion','reason',{});return id==='sichuan'?'……好，先不嘴你。怎麼了？':id==='wenshu'?'好，我在。今天發生什麼了？':'我在。怎麼了？你慢慢說。';}
 
-  return pickReply(r[intent]||r.fallback,history);
+ // Normal single-turn intents, with conservative fallback.
+ const intent=detectChatIntent(t);
+ if(intent!=='fallback' && r[intent]) return say(r[intent]);
+ const fallback={
+   wenshu:['我沒完全聽懂妳這句。妳可以再講直接一點，我不想亂猜。','這句我怕理解錯。妳是在問我，還是在跟我說一件事？'],
+   yanyan:['我怕我理解錯了😅 你可以再說清楚一點嗎？','等一下，我想確認一下。你這句是在問我，還是只是想跟我說？'],
+   sichuan:['蛤？這句我沒接懂。講完整一點，我不亂猜。','等一下，你這句前後補一下。不然我回了又要被你罵亂回。']
+ };
+ return say(fallback[id]);
 }
+
 function chatKey(id){return 'side-chat-'+id}
 function getChat(id){return JSON.parse(localStorage.getItem(chatKey(id))||'[]')}
 function saveChat(id,a){localStorage.setItem(chatKey(id),JSON.stringify(a))}
@@ -296,3 +295,5 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE v11: conservative contextual chat, swipe delete/pin, deletable booking records
 
 // SIDE BUILD v12-1603
+
+// SIDE BUILD v13 state-machine chat; LEFT delete; RIGHT pin

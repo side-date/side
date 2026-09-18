@@ -59,3 +59,7 @@ nav button[data-go="messages"]{position:relative}
 .recordSwipe .recordCard{position:relative;z-index:2;margin:0;background:#fff;touch-action:pan-y;will-change:transform}
 .recordTop{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .recordDelete{border:0;background:transparent;color:#98736c;text-decoration:underline;text-underline-offset:4px;font-size:13px;padding:8px}
+
+/* SIDE v13 directions: swipe LEFT = delete, swipe RIGHT = pin */
+.swipeRow .deleteAction{left:auto!important;right:0!important;background:#8b5f59!important;color:#fff!important}
+.swipeRow .pinAction{right:auto!important;left:0!important;background:#d9cec7!important;color:#4f4541!important}
