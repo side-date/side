@@ -107,3 +107,5 @@ function renderRecords(){
 }
 
 $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}}); $('#chatModal').onclick=e=>{if(e.target===$('#chatModal'))closeChat()};
+
+// SIDE v9 verified messages build
