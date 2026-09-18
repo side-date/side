@@ -90,8 +90,8 @@ const personaVoice={
   }
 };
 function stateKey(id){return `side-chat-state-${id}`}
-function getChatState(id){try{return JSON.parse(localStorage.getItem(stateKey(id))||'{}')}catch(e){return {}}}
-function saveChatState(id,s){localStorage.setItem(stateKey(id),JSON.stringify(s))}
+function getChatState(id){try{const s=JSON.parse(localStorage.getItem(stateKey(id))||'{}');if(s.__engineVersion!==24)return {__engineVersion:24};return s}catch(e){return {__engineVersion:24}}}
+function saveChatState(id,s){s.__engineVersion=24;localStorage.setItem(stateKey(id),JSON.stringify(s))}
 function clearChatState(id){localStorage.removeItem(stateKey(id))}
 function patchState(id,patch){const s=getChatState(id);Object.assign(s,patch);saveChatState(id,s);return s}
 function remember(id,key,value){const s=getChatState(id);s.memory=s.memory||{};s.memory[key]=value;s.lastTopic=key;saveChatState(id,s)}
@@ -104,7 +104,7 @@ function eventReply(id,text){
  const say=(w,y,sc)=>chooseFresh(id,[id==='wenshu'?w:id==='yanyan'?y:sc]);
  const last=getChat(id).slice(-6), lastBot=[...last].reverse().find(m=>m.from==='them')?.text||'', lastUser=[...last].reverse().find(m=>m.from==='me'&&m.text!==t)?.text||'';
  const setEvent=(event,step=1,extra={})=>patchState(id,{event,step,...extra});
- const incidentWords=/被|有人|朋友|同事|主管|老闆|家人|他|她|罵|兇|欺負|吵架|放鳥|拒絕|騙|討厭|生氣|弄|發生|今天/;
+ const incidentWords=/被|有人|朋友|同事|主管|老闆|家人|罵|兇|欺負|吵架|放鳥|拒絕|騙|發生/;
 
  // 功能事件：唯一產生按鈕。
  if(has(t,/預約|我要約|想約你|約見面|可以約嗎|想見面/)){
@@ -115,13 +115,32 @@ function eventReply(id,text){
  // 對「上一則回覆」的反應，優先級最高。
  if(has(t,/^[？?]+$/)){
    setEvent('repair');
-   return {text:id==='sichuan'?'……對，我剛剛那句接得很蠢。你前面是在說你被罵之後很不爽，我有聽懂。':id==='wenshu'?'是我剛剛接得不對。妳前面的意思其實很清楚，我不該又把問題丟回給妳。':'啊，我剛剛那句接得很怪。你前面的意思其實很清楚，是我沒接好。'};
+   return {text:id==='sichuan'?'……幹嘛，我剛剛那句很怪是不是？行，當我沒接好。你前面的話我還記得。':id==='wenshu'?'我剛剛那句是不是接得很怪？是我沒接好。妳前面的話不用重講。':'啊，我剛剛是不是接歪了？前面的話不用重講，我還記得。'};
  }
  if(has(t,/怎麼(都|一直).*回.*一樣|每次.*一樣|你(根本)?沒在聽|亂回|亂講|答非所問|已讀亂回|很敷衍|回覆.*(爛|差)|你在講什麼|接錯|理解錯|態度.*(差|糟)/)){
    setEvent('repair');
    return {text:id==='sichuan'?'……行，剛剛是我接爛了。你前面那件事我沒忘，別重講。':id==='wenshu'?'妳說得對，剛剛是我沒有接住前文。前面的事不用重講，我還記得。':'你說得對，剛剛是我沒有接住前文。前面的事情不用重講，我記得。'};
  }
 
+ // v24：先處理「上一件事的情緒結果」，不能再被舊事件或 fallback 吃掉。
+ if(s.incident && has(t,/不開心|難過|生氣|很氣|委屈|很煩|不爽|想哭|心情.*不好|很受傷|很難受/)){
+   setEvent('incident_feeling',2,{incident:s.incident});
+   if(has(s.incident,/罵我|被罵|兇我|被兇/)) return {text:id==='sichuan'?'被人罵當然會不爽。誰罵的？他到底講了什麼？':id==='wenshu'?'被人那樣說，妳不開心很正常。是誰罵妳？他說了什麼？':'被人罵當然會難受。是誰罵你呀？他說了什麼？'};
+   return {text:id==='sichuan'?'難怪你心情差。那件事裡最讓你火大的是哪一段？':id==='wenshu'?'難怪妳會不舒服。那件事裡最讓妳難受的是哪一部分？':'難怪你會不開心。那件事裡最讓你難受的是哪一部分？'};
+ }
+
+ // v24：具體事件句永遠可以接在「心情不好」後面，並保存原句。
+ if(has(t,/有人罵我|有人兇我|被罵|被兇|跟人吵架|有人欺負我|有人放我鴿子|有人騙我|朋友.*(罵|兇|吵)|同事.*(罵|兇|吵)|主管.*(罵|兇)|老闆.*(罵|兇)/)){
+   setEvent('incident',1,{incident:t});
+   if(has(t,/罵|兇/)) return {text:id==='sichuan'?'誰罵你？他憑什麼？':id==='wenshu'?'有人罵妳？是誰？事情怎麼開始的？':'有人罵你？是誰呀？事情怎麼開始的？'};
+   if(has(t,/吵架|吵/)) return {text:id==='sichuan'?'跟誰吵？怎麼吵起來的？':id==='wenshu'?'跟誰吵起來了？事情怎麼開始的？':'跟誰吵架了？怎麼開始的呀？'};
+   return {text:id==='sichuan'?'嗯，這件事我記住了。後來呢？':id==='wenshu'?'嗯，我記住這件事了。後來呢？':'嗯，我有跟上。後來呢？'};
+ }
+
+ // v24：常見追問直接回答，不要丟進機械 fallback。
+ if(has(t,/你覺得我(該|應該|要)怎麼辦|我該怎麼辦|怎麼辦才好/)){
+   if(s.incident) return {text:id==='sichuan'?'先別急著怪自己。把對方原話跟前因後果講清楚，我再跟你拆。':id==='wenshu'?'先別急著做決定。把對方說了什麼、事情怎麼發生的告訴我，我再陪妳一起判斷。':'先別急著怪自己。你把事情怎麼發生、對方說了什麼告訴我，我們一起想。'};
+ }
  // 明確換話題／直接問角色本人，可中斷任何事件。
  if(has(t,/換個話題|不聊這個|先不說這個|算了不講/)){setEvent('idle');return {text:id==='sichuan'?'行，換。你想問我還是我開題？':id==='wenshu'?'好，那就換一個。妳想問我，還是我開個話題？':'好呀，那換一個～你想問我，還是我來開題？'};}
  if(has(t,/你(今天)?有(發生)?什麼.*(有趣|好玩)|你今天.*(幹嘛|做什麼|怎樣)|今天有趣/)){
@@ -293,3 +312,5 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE BUILD v19: plain-text chat; booking is the only CTA
 
 // SIDE BUILD v20: normal chat has zero quick replies; booking CTA only
+
+// SIDE BUILD v24: cache-busted contextual event engine; right swipe delete / left swipe pin
