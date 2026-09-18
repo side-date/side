@@ -63,3 +63,30 @@ nav button[data-go="messages"]{position:relative}
 /* SIDE v13 directions: swipe LEFT = delete, swipe RIGHT = pin */
 .swipeRow .deleteAction{left:auto!important;right:0!important;background:#8b5f59!important;color:#fff!important}
 .swipeRow .pinAction{right:auto!important;left:0!important;background:#d9cec7!important;color:#4f4541!important}
+
+/* SIDE v15 — authoritative swipe positions
+   向右滑（surface +X）露出左側：置頂
+   向左滑（surface -X）露出右側：刪除 */
+.swipeRow{position:relative!important;overflow:hidden!important}
+.swipeRow .pinAction{
+  position:absolute!important;
+  left:0!important;
+  right:auto!important;
+  top:0!important;
+  bottom:0!important;
+  width:104px!important;
+  background:#d9cec7!important;
+  color:#4f4541!important;
+  z-index:1!important;
+}
+.swipeRow .deleteAction{
+  position:absolute!important;
+  right:0!important;
+  left:auto!important;
+  top:0!important;
+  bottom:0!important;
+  width:104px!important;
+  background:#8b5f59!important;
+  color:#fff!important;
+  z-index:1!important;
+}

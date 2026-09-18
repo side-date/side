@@ -54,7 +54,7 @@ function renderConversations(){
  const rows=Object.keys(profiles).map(id=>({id,p:profiles[id],chat:getChat(id),pin:pins.includes(id)})).filter(x=>x.chat.length)
  .sort((a,b)=>(+b.pin-+a.pin)||(lastChatTime(b.chat.at(-1))-lastChatTime(a.chat.at(-1))));
  if(!rows.length){el.innerHTML='<div class="messageEmpty"><div>💬</div><h2>目前沒有訊息</h2><p>從陪伴者頁面按「發送訊息」，聊天紀錄就會出現在這裡。</p><button data-go-msg="search">尋找陪伴者</button></div>';el.querySelector('[data-go-msg]')?.addEventListener('click',()=>go('search'));return}
- el.innerHTML=rows.map(({id,p,chat,pin})=>{const last=chat.at(-1),pre=last.from==='me'?'你：':'';return `<div class="swipeRow" data-chat-id="${id}"><div class="action deleteAction">刪除</div><div class="action pinAction">${pin?'取消置頂':'置頂'}</div><div class="swipeSurface"><img src="${p.img}" alt=""><span class="conversationText"><b>${pin?'📌 ':''}${escapeHTML(p.name)}</b><small>${pre}${escapeHTML(last.text).replace(/\n/g,' ')}</small></span><span class="conversationSide"><time>${last.time||''}</time>${unread[id]?'<i class="unreadDot">1</i>':''}</span></div></div>`}).join('');
+ el.innerHTML=rows.map(({id,p,chat,pin})=>{const last=chat.at(-1),pre=last.from==='me'?'你：':'';return `<div class="swipeRow" data-chat-id="${id}"><div class="action pinAction">${pin?'取消置頂':'置頂'}</div><div class="action deleteAction">刪除</div><div class="swipeSurface"><img src="${p.img}" alt=""><span class="conversationText"><b>${pin?'📌 ':''}${escapeHTML(p.name)}</b><small>${pre}${escapeHTML(last.text).replace(/\n/g,' ')}</small></span><span class="conversationSide"><time>${last.time||''}</time>${unread[id]?'<i class="unreadDot">1</i>':''}</span></div></div>`}).join('');
  $$('.swipeRow').forEach(bindSwipeRow);
 }
 function bindSwipeRow(row){
@@ -83,7 +83,7 @@ const chatReplies={
     affection:['這種話不要隨便對人說。……不過我看到了。','嗯。知道了。妳今天怎麼突然這麼會說？'],
     food:['先回答我，有沒有吃飯？','可以。想吃什麼？別又跟我說隨便。'],
     sleep:['睏了就去睡，別拿熬夜當習慣。','晚安。手機放下，剩下的明天再說。'],
-    booking:['要約哪一天？妳先給我日期，我再看。','可以談時間。先說日期和大概想做什麼。'],
+    booking:['可以。妳想先問預約規則，還是直接給我日期？','可以談時間。先說日期。'],
     question:['妳想知道哪一部分？問清楚一點，我回答妳。','可以問。只是答案不一定是妳想聽的。'],
     thanks:['不用謝。妳有比較好一點就行。','嗯，收到了。'],
     sorry:['先別急著道歉。妳做了什麼？','如果真的有做錯，再道歉也不遲。先把事情說清楚。'],
@@ -99,7 +99,7 @@ const chatReplies={
     affection:['突然這樣說，我會有點不知道怎麼接欸☺️','有收到。今天怎麼突然這麼坦白？'],
     food:['有吃東西嗎？如果還沒，先找點你喜歡的吃吧。','好呀，你今天想吃什麼？'],
     sleep:['睏了就先去睡吧，明天還可以繼續聊。晚安。','晚安～今天辛苦了。'],
-    booking:['可以呀，你有想約哪一天嗎？','你先告訴我日期，我們再看看白天還是晚上比較適合。'],
+    booking:['可以呀。你想先問預約規則，還是直接選日期？','可以，你想約哪一天？'],
     question:['可以問呀。你想知道什麼？','嗯，我在聽，你問。'],
     thanks:['不客氣☺️ 有幫上一點忙就好。','不用謝啦。'],
     sorry:['沒關係，先不用一直道歉。你是因為哪件事覺得過意不去？','我沒有生氣。你慢慢說就好。'],
@@ -115,7 +115,7 @@ const chatReplies={
     affection:['少來。……但我看到了。','你今天吃錯藥？突然講這種話🙂'],
     food:['先去吃飯。餓著腦袋只會更笨。','吃什麼？敢回隨便我就不理你。'],
     sleep:['去睡。明天黑眼圈不要怪我沒提醒。','晚安。手機丟遠一點，懂？'],
-    booking:['要約就講日期，不要叫我猜。','哪天？時間？一次講完。'],
+    booking:['可以約。先講日期。','要約就先給我哪一天。'],
     question:['問啊。先說好，我不負責講你愛聽的。','什麼問題？'],
     thanks:['免了。下次少做點蠢事就算謝我。','嗯，知道就好🙂'],
     sorry:['你先說你幹嘛了，再決定這句對不起值不值錢。','好啦。知道錯哪裡比較重要。'],
@@ -158,7 +158,9 @@ function clearChatState(id){localStorage.removeItem(stateKey(id))}
 function cleanAnswer(t){return String(t).trim().replace(/[。！？!?]+$/,'')}
 
 function replyFor(id,text){
- const history=getChat(id),t=String(text).trim(),r=chatReplies[id],st=getChatState(id);
+ const allHistory=getChat(id),t=String(text).trim(),r=chatReplies[id],st=getChatState(id);
+ // sendChat 已先把本次使用者訊息存入紀錄；回覆判斷時排除最後這一筆，避免把自己當成「上一句」。
+ const history=(allHistory.length && allHistory[allHistory.length-1].from==='me' && allHistory[allHistory.length-1].text===t)?allHistory.slice(0,-1):allHistory;
  const prevBot=[...history].reverse().find(m=>m.from==='them');
  const say=p=>pickReply(p,history);
  const set=(topic,waiting,data={})=>saveChatState(id,{topic,waiting,data,updated:Date.now()});
@@ -225,7 +227,7 @@ function replyFor(id,text){
  }
 
  // Start explicit flows.
- if(/可不可以預約|可以預約嗎|我要預約|想預約|想約你/.test(t)){set('booking','date',{});return id==='sichuan'?'可以。哪一天？':id==='wenshu'?'可以。妳想約哪一天？':'可以呀，你想約哪一天？';}
+ if(/可不可以預約|可以預約嗎|我要預約|想預約|想約你/.test(t)){set('booking','date',{});return id==='sichuan'?'可以。哪天？':id==='wenshu'?'可以。妳想約哪一天？':'可以呀，你想約哪一天？';}
  if(/好餓|很餓|餓死|肚子餓/.test(t)){set('food','ate',{});return id==='sichuan'?'你吃飯了沒？':id==='wenshu'?'先回答我，有沒有吃飯？':'你有吃飯嗎？';}
  if(/心情不好|難過|想哭|不開心|委屈|低落|崩潰/.test(t)){set('emotion','reason',{});return id==='sichuan'?'……好，先不嘴你。怎麼了？':id==='wenshu'?'好，我在。今天發生什麼了？':'我在。怎麼了？你慢慢說。';}
 
@@ -297,3 +299,7 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE BUILD v12-1603
 
 // SIDE BUILD v13 state-machine chat; LEFT delete; RIGHT pin
+
+// SIDE BUILD v14: fix reply history/current-message ordering
+
+// SIDE BUILD v15: RIGHT swipe = pin(left reveal), LEFT swipe = delete(right reveal)
