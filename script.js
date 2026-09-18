@@ -49,27 +49,26 @@ function lastChatTime(m){if(m&&m.ts)return m.ts;return 0}
 function getPinnedChats(){return JSON.parse(localStorage.getItem('side-pinned-chats')||'[]')}
 function setPinnedChat(id,on){let a=getPinnedChats();a=on?[id,...a.filter(x=>x!==id)]:a.filter(x=>x!==id);localStorage.setItem('side-pinned-chats',JSON.stringify(a))}
 function renderConversations(){
-  const el=$('#conversationList');if(!el)return;
-  const unread=getUnread(), pinned=getPinnedChats();
-  const rows=Object.keys(profiles).map(id=>({id,p:profiles[id],chat:getChat(id),pin:pinned.includes(id)})).filter(x=>x.chat.length)
-    .sort((a,b)=>(Number(b.pin)-Number(a.pin)) || (lastChatTime(b.chat[b.chat.length-1])-lastChatTime(a.chat[a.chat.length-1])));
-  if(!rows.length){el.innerHTML='<div class="messageEmpty"><div>💬</div><h2>目前沒有訊息</h2><p>從陪伴者頁面按「發送訊息」，聊天紀錄就會出現在這裡。</p><button data-go-msg="search">尋找陪伴者</button></div>';const b=el.querySelector('[data-go-msg]');if(b)b.onclick=()=>go('search');return}
-  el.innerHTML=rows.map(({id,p,chat,pin})=>{const last=chat[chat.length-1],prefix=last.from==='me'?'你：':'',preview=escapeHTML(last.text).replace(/\n/g,' ');return `<div class="conversationSwipe" data-chat-id="${id}">
-    <div class="swipeAction swipeDelete">刪除</div><div class="swipeAction swipePin">${pin?'取消置頂':'置頂'}</div>
-    <button class="conversationMain swipeCard"><img src="${p.img}" alt=""><span class="conversationText"><b>${pin?'📌 ':''}${escapeHTML(p.name)}</b><small>${prefix}${preview}</small></span><span class="conversationSide"><time>${last.time||''}</time>${unread[id]?'<i class="unreadDot">1</i>':''}</span></button>
-  </div>`}).join('');
-  $$('.conversationSwipe').forEach(row=>attachConversationSwipe(row));
+ const el=$('#conversationList');if(!el)return;
+ const unread=getUnread(),pins=getPinnedChats();
+ const rows=Object.keys(profiles).map(id=>({id,p:profiles[id],chat:getChat(id),pin:pins.includes(id)})).filter(x=>x.chat.length)
+ .sort((a,b)=>(+b.pin-+a.pin)||(lastChatTime(b.chat.at(-1))-lastChatTime(a.chat.at(-1))));
+ if(!rows.length){el.innerHTML='<div class="messageEmpty"><div>💬</div><h2>目前沒有訊息</h2><p>從陪伴者頁面按「發送訊息」，聊天紀錄就會出現在這裡。</p><button data-go-msg="search">尋找陪伴者</button></div>';el.querySelector('[data-go-msg]')?.addEventListener('click',()=>go('search'));return}
+ el.innerHTML=rows.map(({id,p,chat,pin})=>{const last=chat.at(-1),pre=last.from==='me'?'你：':'';return `<div class="swipeRow" data-chat-id="${id}"><div class="action deleteAction">刪除</div><div class="action pinAction">${pin?'取消置頂':'置頂'}</div><div class="swipeSurface"><img src="${p.img}" alt=""><span class="conversationText"><b>${pin?'📌 ':''}${escapeHTML(p.name)}</b><small>${pre}${escapeHTML(last.text).replace(/\n/g,' ')}</small></span><span class="conversationSide"><time>${last.time||''}</time>${unread[id]?'<i class="unreadDot">1</i>':''}</span></div></div>`}).join('');
+ $$('.swipeRow').forEach(bindSwipeRow);
 }
-function attachConversationSwipe(row){
-  const card=row.querySelector('.swipeCard'), id=row.dataset.chatId; let startX=0,startY=0,dx=0,moved=false;
-  card.addEventListener('touchstart',e=>{const t=e.touches[0];startX=t.clientX;startY=t.clientY;dx=0;moved=false;card.style.transition='none'},{passive:true});
-  card.addEventListener('touchmove',e=>{const t=e.touches[0],dy=t.clientY-startY;dx=t.clientX-startX;if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){moved=true;dx=Math.max(-96,Math.min(96,dx));card.style.transform=`translateX(${dx}px)`}},{passive:true});
-  card.addEventListener('touchend',()=>{card.style.transition='transform .22s ease';if(!moved){card.style.transform='';openChat(id);return}
-    if(dx>58){card.style.transform='translateX(96px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else card.style.transform=''},120)}
-    else if(dx<-58){card.style.transform='translateX(-96px)';setTimeout(()=>{const on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},120)}
-    else card.style.transform='';
-  });
-  card.addEventListener('click',e=>{if(!moved)openChat(id)});
+function bindSwipeRow(row){
+ const surface=row.querySelector('.swipeSurface'),id=row.dataset.chatId;
+ let sx=0,sy=0,dx=0,drag=false,suppressClick=false;
+ surface.addEventListener('touchstart',e=>{let t=e.touches[0];sx=t.clientX;sy=t.clientY;dx=0;drag=false;surface.style.transition='none'},{passive:true});
+ surface.addEventListener('touchmove',e=>{let t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;if(Math.abs(x)>8&&Math.abs(x)>Math.abs(y)){drag=true;dx=Math.max(-104,Math.min(104,x));surface.style.transform=`translateX(${dx}px)`}},{passive:true});
+ surface.addEventListener('touchend',()=>{surface.style.transition='transform .2s ease';suppressClick=drag;
+   if(dx>=55){surface.style.transform='translateX(104px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else surface.style.transform='translateX(0)'},80)}
+   else if(dx<=-55){surface.style.transform='translateX(-104px)';setTimeout(()=>{let on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},80)}
+   else surface.style.transform='translateX(0)';
+   setTimeout(()=>suppressClick=false,250);
+ });
+ surface.addEventListener('click',()=>{if(!suppressClick&&!drag)openChat(id)});
 }
 
 function escapeHTML(v){return String(v).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}
@@ -157,6 +156,35 @@ function replyFor(id,text){
   const prevUser=recentUser(history.filter(m=>m.text!==text));
   const prevBot=recentBot(history);
   const intent=detectChatIntent(t);
+
+  // Follow the immediately previous character question before doing generic intent matching.
+  if(prevBot){
+    const q=prevBot.text||'';
+    if(/有沒有吃飯|有吃飯|吃了嗎/.test(q)){
+      if(/^(沒有|沒|還沒|沒有啊|沒吃|還沒有)[!！?？。 ]*$/.test(t)){
+        const pools={
+          wenshu:['那先去吃。妳現在想吃什麼？我幫妳挑，不准再回我「隨便」。','難怪會餓。先想一個最想吃的，飯、麵，還是炸的？'],
+          yanyan:['那難怪會餓呀。你現在最想吃什麼？飯、麵，還是想吃點炸的？','還沒吃喔？那我們先想吃什麼，不然等等更餓。'],
+          sichuan:['那你喊餓不是廢話嗎。想吃什麼？我幫你排除難吃的。','沒吃還說好餓。行，現在想吃飯、麵，還是垃圾食物？']
+        };return pickReply(pools[id],history);
+      }
+      if(/薯條|炸雞|漢堡|披薩|pizza|拉麵|火鍋|壽司|飯|麵|牛排|雞排|鹽酥雞|甜點|蛋糕|飲料|奶茶/.test(t)){
+        const pools={
+          wenshu:[`可以，${t.replace(/^我想吃/,'')}。但別只吃一點點就算一餐。`,`想吃${t.replace(/^我想吃/,'')}就去吃。妳都餓了，別再拖。`],
+          yanyan:[`好呀，那就吃${t.replace(/^我想吃/,'')}～你剛剛都說餓了，快去吃。`,`可以耶。${t.replace(/^我想吃/,'')}聽起來就很適合現在。`],
+          sichuan:[`${t.replace(/^我想吃/,'')}？行啊，至少這次不是回我「隨便」。`,`可以。去吃${t.replace(/^我想吃/,'')}，不要等一下又餓到脾氣差。`]
+        };return pickReply(pools[id],history);
+      }
+    }
+    if(/想吃什麼/.test(q) && /薯條|炸雞|漢堡|披薩|pizza|拉麵|火鍋|壽司|飯|麵|牛排|雞排|鹽酥雞|甜點|蛋糕|飲料|奶茶/.test(t)){
+      const food=t.replace(/^我想吃/,'');
+      const pools={
+        wenshu:[`薯條可以，但如果這是正餐，再加點別的。妳不是才說很餓？`,`好，${food}。想吃就吃，別餓著還一直跟我聊天。`],
+        yanyan:[`好呀，${food}～那快去吃，不然越聊越餓了。`,`可以耶。那今天就吃${food}，再配個你喜歡的飲料？`],
+        sichuan:[`${food}喔？可以。至少你終於選了，不是又丟一句隨便給我。`,`行，${food}。快去，不然等等又跟我喊餓。`]
+      };return pickReply(pools[id],history);
+    }
+  }
 
   // User is reacting to the character's tone / previous reply.
   if(/你(的)?態度|態度.*糟|你好兇|你很兇|你很冷淡|你很敷衍|你很機車|你很靠北|你很討厭|不想跟你講|不跟你說了|算了.*不說/.test(t)){
@@ -249,18 +277,15 @@ $('#bookingForm').onsubmit=e=>{
   localStorage.setItem('side-bookings',JSON.stringify(records)); closeBooking(); toast('預約已加入紀錄 ♡');
 };
 function deleteBookingRecord(index){
-  const records=JSON.parse(localStorage.getItem('side-bookings')||'[]');
-  if(!records[index])return;
-  if(confirm('確定要刪除這筆預約紀錄嗎？')){
-    records.splice(index,1);localStorage.setItem('side-bookings',JSON.stringify(records));renderRecords();toast('預約紀錄已刪除');
-  }
+ const a=JSON.parse(localStorage.getItem('side-bookings')||'[]');if(!a[index])return;
+ if(confirm('確定要刪除這筆預約紀錄嗎？')){a.splice(index,1);localStorage.setItem('side-bookings',JSON.stringify(a));renderRecords();toast('預約紀錄已刪除')}
 }
 function renderRecords(){
-  const records=JSON.parse(localStorage.getItem('side-bookings')||'[]');
-  const el=$('#recordList'); if(!el)return;
-  if(!records.length){el.innerHTML='<div class="recordEmpty"><div>♡</div><h2>目前沒有預約紀錄</h2><p>完成預約後，紀錄會顯示在這裡。</p><button onclick="go(\'search\')">瀏覽陪伴者</button></div>';return}
-  el.innerHTML=records.map((r,i)=>{const p=profiles[r.id];return `<article class="recordCard"><div class="recordTop"><small>BOOKING CONFIRMED</small><button class="recordDelete" data-record-index="${i}" aria-label="刪除預約紀錄">刪除</button></div><h2>${p?p.name:r.id}</h2><div class="recordMeta"><span>日期　${r.date}</span><span>時間　${r.time}</span><span>方案　${r.plan}</span><span>狀態　預約成立</span></div></article>`}).join('');
-  $$('.recordDelete').forEach(b=>b.onclick=()=>deleteBookingRecord(Number(b.dataset.recordIndex)));
+ const a=JSON.parse(localStorage.getItem('side-bookings')||'[]'),el=$('#recordList');if(!el)return;
+ if(!a.length){el.innerHTML='<div class="recordEmpty"><div>♡</div><h2>目前沒有預約紀錄</h2><p>完成預約後，紀錄會顯示在這裡。</p><button onclick="go(\'search\')">瀏覽陪伴者</button></div>';return}
+ el.innerHTML=a.map((r,i)=>{let p=profiles[r.id];return `<div class="recordSwipe" data-record-index="${i}"><div class="recordSwipeDelete">刪除</div><article class="recordCard recordSurface"><div class="recordTop"><small>BOOKING CONFIRMED</small><button type="button" class="recordDelete" data-record-index="${i}">刪除紀錄</button></div><h2>${p?p.name:r.id}</h2><div class="recordMeta"><span>日期　${r.date}</span><span>時間　${r.time}</span><span>方案　${r.plan}</span><span>狀態　預約成立</span></div></article></div>`}).join('');
+ $$('.recordDelete').forEach(b=>b.onclick=()=>deleteBookingRecord(+b.dataset.recordIndex));
+ $$('.recordSwipe').forEach(row=>{let s=row.querySelector('.recordSurface'),sx=0,dx=0;s.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;dx=0;s.style.transition='none'},{passive:true});s.addEventListener('touchmove',e=>{dx=Math.max(0,Math.min(104,e.touches[0].clientX-sx));s.style.transform=`translateX(${dx}px)`},{passive:true});s.addEventListener('touchend',()=>{s.style.transition='transform .2s ease';if(dx>55){s.style.transform='translateX(104px)';setTimeout(()=>deleteBookingRecord(+row.dataset.recordIndex),80)}else s.style.transform='translateX(0)'})});
 }
 
 
@@ -269,3 +294,5 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE v10 contextual chat build
 
 // SIDE v11: conservative contextual chat, swipe delete/pin, deletable booking records
+
+// SIDE BUILD v12-1603
