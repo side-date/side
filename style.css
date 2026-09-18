@@ -98,3 +98,6 @@ nav button[data-go="messages"]{position:relative}
 .quickReplies button:active,.chatAction:active{transform:scale(.98);background:#eee6e1}
 .rootQuick{margin-top:16px}
 .chatWelcome .quickReplies{justify-content:center}
+
+/* v19: normal chat has no choice chips */
+.quickReplies{display:none!important}

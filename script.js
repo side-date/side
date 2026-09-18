@@ -167,7 +167,7 @@ const personaLine={
   love:'感情的事可以說。妳現在比較想被聽著，還是想聽我的看法？',
   work:'工作讓妳煩？先說最卡的那一件就好。',
   hello:'嗯，我在。今天想聊什麼？',
-  unknown:'這句我怕理解錯。妳可以再講直接一點，或者從下面選一個。'
+  unknown:'這句我怕理解錯。妳可以再講直接一點，我不想亂猜。'
  },
  yanyan:{
   mood:'我在。現在不用逼自己整理好情緒。你比較需要哪一種？',
@@ -180,7 +180,7 @@ const personaLine={
   love:'可以說呀。你想先讓我聽，還是想聽我的想法？',
   work:'工作很累嗎？你先說今天最煩的是哪一件。',
   hello:'在呀～今天想聊什麼？',
-  unknown:'我怕我理解錯。你可以再說直接一點，或從下面選一個。'
+  unknown:'我怕我理解錯。你可以再說直接一點，我不想亂猜。'
  },
  sichuan:{
   mood:'……行，今天先不嘴你。你要哪種？',
@@ -193,7 +193,7 @@ const personaLine={
   love:'感情喔。你要我聽，還是要我講難聽但有用的？',
   work:'工作又怎樣了？挑最煩的那件講。',
   hello:'在。幹嘛？',
-  unknown:'這句我不亂猜。講直接點，或下面選一個。'
+  unknown:'這句我不亂猜。講直接點，我不亂猜。'
  }
 };
 function quickFor(topic){
@@ -217,57 +217,58 @@ function replyFor(id,text){
  // 已進入某個主題時，先依「目前話題」理解新句子，不重新從零分類。
  if(st.topic==='food'){
    if(/建議|你覺得|吃什麼|幫我(挑|選)|推薦/.test(t)) return quickReplyFor(id,'foodPick');
-   if(/薯條|炸物|炸的|雞排|鹽酥雞/.test(t)) return {text:id==='sichuan'?'薯條可以，但你要是很餓，最好再補點真的能頂肚子的。':id==='wenshu'?'薯條可以。如果妳是真的餓，我會建議再配一點比較能當正餐的東西。':'薯條可以呀～但如果真的很餓，我會再配一點正餐。',quick:[['那你幫我挑','foodPick'],['我就想吃薯條','foodSelf'],['算了不吃','foodNo']]};
-   if(/^(沒有|沒|還沒|沒吃)[啊呀。！! ]*$/.test(t)) return {text:id==='sichuan'?'難怪。那你現在想吃什麼？':id==='wenshu'?'難怪會餓。妳現在比較想吃什麼？':'難怪會餓呀。那你現在想吃什麼？',quick:[['幫我挑','foodPick'],['我自己選','foodSelf']]};
+   if(/薯條|炸物|炸的|雞排|鹽酥雞/.test(t)) return {text:id==='sichuan'?'薯條可以，但你要是很餓，最好再補點真的能頂肚子的。':id==='wenshu'?'薯條可以。如果妳是真的餓，我會建議再配一點比較能當正餐的東西。':'薯條可以呀～但如果真的很餓，我會再配一點正餐。'};
+   if(/^(沒有|沒|還沒|沒吃)[啊呀。！! ]*$/.test(t)) return {text:id==='sichuan'?'難怪。那你現在想吃什麼？':id==='wenshu'?'難怪會餓。妳現在比較想吃什麼？':'難怪會餓呀。那你現在想吃什麼？'};
    if(/不想吃|不吃|沒胃口/.test(t)) return quickReplyFor(id,'foodNo');
  }
  if(st.topic==='mood'||st.topic==='love'||st.topic==='work'){
-   if(/意見|建議|你覺得|怎麼辦|怎麼做/.test(t)) return quickReplyFor(id,'advice');
-   if(/聽我|我想說|讓我說|抱怨/.test(t)) return quickReplyFor(id,'listen');
-   if(/不想講|換話題|別聊|轉移/.test(t)) return quickReplyFor(id,'distract');
-   if(t.length>=3) return {text:id==='sichuan'?'嗯，我有在聽。這件事讓你最不爽的是哪一段？':id==='wenshu'?'嗯，我有跟上。這件事裡，現在最讓妳難受的是哪一部分？':'嗯，我有在聽。這件事裡現在最讓你不舒服的是哪一部分？',quick:[['我繼續說','listen'],['給我意見','advice'],['換個話題','distract']]};
+   if(/不想講|換話題|別聊|轉移/.test(t)){clearChatState(id);return {text:id==='sichuan'?'行，不聊這個。你想換什麼？':id==='wenshu'?'好，那先不聊這個。妳想換成什麼？':'好～那先換個話題。你想聊什麼？'};}
+   if(/意見|建議|你覺得|怎麼辦|怎麼做/.test(t)) return {text:id==='sichuan'?'可以。先把你最在意的那一點講清楚，我再給你意見。':id==='wenshu'?'可以。妳先告訴我現在最在意的是哪一點，我再給妳比較實際的想法。':'可以呀。你先告訴我現在最在意的是哪一點，我再陪你一起想。'};
+   if(/下雨|雨天|雨/.test(t)) return {text:id==='sichuan'?'原來是下雨。你是不喜歡濕答答的，還是雨天本身就讓你煩？':id==='wenshu'?'原來是下雨讓妳悶。妳是不喜歡濕答答的感覺，還是雨天本身就容易讓妳心情變差？':'原來是下雨讓你不開心。你是不喜歡濕答答的感覺，還是雨天本身就會讓你比較悶？'};
+   if(/聽我|我想說|讓我說|抱怨/.test(t)) return {text:id==='sichuan'?'行，我聽。你講。':id==='wenshu'?'好，妳說。我先聽，不急著分析。':'好，我聽。你慢慢說。'};
+   if(t.length>=3) return {text:id==='sichuan'?'嗯，我有在聽。你接著講，別急著整理成結論。':id==='wenshu'?'嗯，我有跟上。妳接著說，不用急著把它講得很完整。':'嗯，我有在聽。你接著說就好，不用急著整理。'};
  }
  if(st.topic==='idle' && /建議|做什麼|幹嘛|不知道/.test(t)) return quickReplyFor(id,'idleDo');
  if(st.topic==='sleep' && /想很多|停不下來|腦袋|一直想/.test(t)) return quickReplyFor(id,'sleepThink');
  // 開啟新主題。
- if(/心情不好|今天不好|不開心|難過|想哭|委屈|低落|很煩/.test(t)){saveChatState(id,{topic:'mood'});return {text:p.mood,quick:quickFor('mood')};}
- if(/好餓|很餓|餓死|肚子餓|沒吃飯|還沒吃/.test(t)){saveChatState(id,{topic:'food'});return {text:p.food,quick:quickFor('food')};}
- if(/無聊|好無聊/.test(t)){saveChatState(id,{topic:'idle'});return {text:p.idle,quick:quickFor('idle')};}
- if(/睡不著|失眠|不睏|不困/.test(t)){saveChatState(id,{topic:'sleep'});return {text:p.sleep,quick:quickFor('sleep')};}
- if(/失戀|分手|前任|感情|曖昧|男友|女友/.test(t)){saveChatState(id,{topic:'love'});return {text:p.love,quick:quickFor('love')};}
- if(/工作|上班|加班|主管|老闆|同事|好累|很累/.test(t)){saveChatState(id,{topic:'work'});return {text:p.work,quick:quickFor('work')};}
- if(/^(嗨|哈囉|hi|hello|在嗎|你好)[!！?？。 ]*$/i.test(t)){clearChatState(id);return {text:p.hello,quick:quickFor('root')};}
- return {text:p.unknown,quick:quickFor('root')};
+ if(/心情不好|今天不好|不開心|難過|想哭|委屈|低落|很煩/.test(t)){saveChatState(id,{topic:'mood'});return {text:p.mood};}
+ if(/好餓|很餓|餓死|肚子餓|沒吃飯|還沒吃/.test(t)){saveChatState(id,{topic:'food'});return {text:p.food};}
+ if(/無聊|好無聊/.test(t)){saveChatState(id,{topic:'idle'});return {text:p.idle};}
+ if(/睡不著|失眠|不睏|不困/.test(t)){saveChatState(id,{topic:'sleep'});return {text:p.sleep};}
+ if(/失戀|分手|前任|感情|曖昧|男友|女友/.test(t)){saveChatState(id,{topic:'love'});return {text:p.love};}
+ if(/工作|上班|加班|主管|老闆|同事|好累|很累/.test(t)){saveChatState(id,{topic:'work'});return {text:p.work};}
+ if(/^(嗨|哈囉|hi|hello|在嗎|你好)[!！?？。 ]*$/i.test(t)){clearChatState(id);return {text:p.hello};}
+ return {text:p.unknown};
 }
 function quickReplyFor(id,key){
  const p=personaLine[id];
  const map={
-  mood:()=>({text:p.mood,quick:quickFor('mood')}),
-  listen:()=>({text:p.listen,quick:[['我繼續說','continue'],['我說完了','done'],['給我意見','advice']]}),
-  advice:()=>({text:p.advice,quick:[['我跟你說','continue'],['算了先不講','distract']]}),
-  distract:()=>({text:p.distract,quick:[['聊吃的','food'],['隨便聊聊','idleRandom'],['我要預約','booking']]}),
-  stay:()=>({text:id==='sichuan'?'行。先待著，不逼你講。':id==='wenshu'?'好。那就先待著，不用說什麼。':'好呀，我先陪你待一下。',quick:[['想說了','listen'],['換個話題','distract']]}),
-  food:()=>({text:p.food,quick:quickFor('food')}),
-  foodPick:()=>({text:id==='sichuan'?'飯、麵、炸的。三個選一個。':id==='wenshu'?'那我幫妳縮小範圍：飯、麵，還是想吃炸的？':'那我幫你選～飯、麵、還是炸的？',quick:[['飯','foodRice'],['麵','foodNoodle'],['炸的','foodFried']]}),
+  mood:()=>({text:p.mood}),
+  listen:()=>({text:p.listen}),
+  advice:()=>({text:p.advice}),
+  distract:()=>({text:p.distract}),
+  stay:()=>({text:id==='sichuan'?'行。先待著，不逼你講。':id==='wenshu'?'好。那就先待著，不用說什麼。':'好呀，我先陪你待一下。'}),
+  food:()=>({text:p.food}),
+  foodPick:()=>({text:id==='sichuan'?'飯、麵、炸的。三個選一個。':id==='wenshu'?'那我幫妳縮小範圍：飯、麵，還是想吃炸的？':'那我幫你選～飯、麵、還是炸的？'}),
   foodSelf:()=>({text:id==='sichuan'?'行，選好了記得真的去吃。':id==='wenshu'?'好，選好就去吃，別一直餓著。':'好～選好記得真的去吃喔。'}),
   foodNo:()=>({text:id==='sichuan'?'不吃也行，等等餓到脾氣差別怪我。':id==='wenshu'?'不太想吃也至少喝點東西，別一直空腹。':'不想吃的話至少喝點東西，好嗎？'}),
   foodRice:()=>({text:id==='sichuan'?'那就吃飯。別再選半天。':id==='wenshu'?'那就吃飯。想清淡一點還是重口味？':'那吃飯～想清淡的還是重口味？'}),
   foodNoodle:()=>({text:id==='sichuan'?'麵。可以，去找一家近的。':id==='wenshu'?'那就麵。湯麵或乾麵，看妳現在比較想吃哪種。':'麵可以呀～湯的還是乾的？'}),
   foodFried:()=>({text:id==='sichuan'?'我就知道。去吃，至少再配個飲料。':id==='wenshu'?'可以，但別只拿一小份薯條當正餐。':'可以～但不要只吃一點點就算一餐喔。'}),
-  idle:()=>({text:p.idle,quick:quickFor('idle')}),
+  idle:()=>({text:p.idle}),
   idleChat:()=>({text:id==='sichuan'?'行。你最近有什麼事一直掛在腦子裡？':id==='wenshu'?'好。最近有沒有哪件事一直放在心上？':'好呀～最近有什麼事情一直在你腦袋裡？'}),
   idleDo:()=>({text:id==='sichuan'?'去洗澡、找東西吃、看一集劇。挑一個。':id==='wenshu'?'可以找件不用動太多腦的事：洗澡、散步，或看一集喜歡的東西。':'那找個輕鬆的～散步、洗澡、看一集劇，選一個？'}),
   idleRandom:()=>({text:id==='sichuan'?'那我問。最近最想買但一直沒買的是什麼？':id==='wenshu'?'那隨便聊。最近有沒有什麼東西，是妳一直想買卻還沒下手的？':'那我隨便問一題～最近有沒有一直想買但還沒買的東西？'}),
-  sleep:()=>({text:p.sleep,quick:quickFor('sleep')}),
+  sleep:()=>({text:p.sleep}),
   sleepThink:()=>({text:id==='sichuan'?'那就別逼自己睡。腦子裡最吵的那件事是什麼？':id==='wenshu'?'那先別逼自己立刻睡。腦子裡現在最放不下的是哪件事？':'那先不要逼自己睡。現在腦袋裡一直轉的是什麼？'}),
   sleepAwake:()=>({text:id==='sichuan'?'那就晚點睡。別躺著硬耗。':id==='wenshu'?'那就先起來做點安靜的事，等真的有睡意再躺。':'那先不要硬睡～做點安靜的事，睏了再回床上。'}),
-  love:()=>({text:p.love,quick:quickFor('love')}),
-  work:()=>({text:p.work,quick:quickFor('work')}),
+  love:()=>({text:p.love}),
+  work:()=>({text:p.work}),
   booking:()=>({text:id==='sichuan'?'行，直接選日期。':id==='wenshu'?'可以，直接看看可預約日期。':'可以呀，直接選日期吧～',action:'booking',label:'查看可預約日期'}),
   continue:()=>({text:id==='sichuan'?'嗯，講。':id==='wenshu'?'好，妳繼續。':'嗯嗯，你繼續。'}),
   done:()=>({text:id==='sichuan'?'行。那先到這。':id==='wenshu'?'好。說完就先休息一下。':'好～那先讓自己休息一下。'})
  };
- return (map[key]||(()=>({text:p.unknown,quick:quickFor('root')})))();
+ return (map[key]||(()=>({text:p.unknown})))();
 }
 
 function chatKey(id){return 'side-chat-'+id}
@@ -278,13 +279,12 @@ function closeChat(){clearTimeout(typingTimer);$('#chatTyping').classList.remove
 function renderChat(){
  if(!chatProfileId)return;
  const a=getChat(chatProfileId),box=$('#chatMessages');
- box.innerHTML=a.length?a.map((m,i)=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}${m.action?`<button class="chatAction" data-action="${m.action}">${escapeHTML(m.label||'前往')}</button>`:''}${m.quick&&m.quick.length?`<div class="quickReplies">${m.quick.map(q=>`<button data-quick="${escapeHTML(q[1])}">${escapeHTML(q[0])}</button>`).join('')}</div>`:''}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。<div class="quickReplies rootQuick">${quickFor('root').map(q=>`<button data-quick="${q[1]}">${q[0]}</button>`).join('')}</div></div>`;
+ box.innerHTML=a.length?a.map((m,i)=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}${m.action?`<button class="chatAction" data-action="${m.action}">${escapeHTML(m.label||'前往預約')}</button>`:''}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。</div>`;
  $$('.chatAction',box).forEach(b=>b.onclick=()=>{if(b.dataset.action==='booking'){const id=chatProfileId;closeChat();setTimeout(()=>openBooking(id),180)}});
- $$('.quickReplies button',box).forEach(b=>b.onclick=()=>sendQuickReply(b.dataset.quick,b.textContent));
  box.scrollTop=box.scrollHeight;
 }
 function appendBotReply(id,obj){
- const b=getChat(id);b.push({from:'them',text:obj.text,action:obj.action||'',label:obj.label||'',quick:obj.quick||[],time:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),ts:Date.now()});saveChat(id,b);
+ const b=getChat(id);b.push({from:'them',text:obj.text,action:obj.action||'',label:obj.label||'',time:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),ts:Date.now()});saveChat(id,b);
  if(chatProfileId===id&&$('#chatModal').classList.contains('open')){markChatRead(id);$('#chatTyping').classList.remove('show');renderChat()}else{setChatUnread(id,true);updateUnreadBadge()}renderConversations();
 }
 function sendQuickReply(key,label){
@@ -356,3 +356,5 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE BUILD v17 bounded dialogue tree + quick replies + booking CTA
 
 // SIDE BUILD v18 topic-aware free text + guaranteed booking CTA
+
+// SIDE BUILD v19: plain-text chat; booking is the only CTA
