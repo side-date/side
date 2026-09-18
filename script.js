@@ -46,14 +46,30 @@ function setChatUnread(id,value){const u=getUnread();if(value)u[id]=true;else de
 function markChatRead(id){setChatUnread(id,false);updateUnreadBadge()}
 function updateUnreadBadge(){const n=Object.keys(getUnread()).length,el=$('#navUnread');if(!el)return;el.textContent=n?String(n):'';el.classList.toggle('show',n>0)}
 function lastChatTime(m){if(m&&m.ts)return m.ts;return 0}
+function getPinnedChats(){return JSON.parse(localStorage.getItem('side-pinned-chats')||'[]')}
+function setPinnedChat(id,on){let a=getPinnedChats();a=on?[id,...a.filter(x=>x!==id)]:a.filter(x=>x!==id);localStorage.setItem('side-pinned-chats',JSON.stringify(a))}
 function renderConversations(){
   const el=$('#conversationList');if(!el)return;
-  const unread=getUnread();
-  const rows=Object.keys(profiles).map(id=>({id,p:profiles[id],chat:getChat(id)})).filter(x=>x.chat.length).sort((a,b)=>lastChatTime(b.chat[b.chat.length-1])-lastChatTime(a.chat[a.chat.length-1]));
+  const unread=getUnread(), pinned=getPinnedChats();
+  const rows=Object.keys(profiles).map(id=>({id,p:profiles[id],chat:getChat(id),pin:pinned.includes(id)})).filter(x=>x.chat.length)
+    .sort((a,b)=>(Number(b.pin)-Number(a.pin)) || (lastChatTime(b.chat[b.chat.length-1])-lastChatTime(a.chat[a.chat.length-1])));
   if(!rows.length){el.innerHTML='<div class="messageEmpty"><div>💬</div><h2>目前沒有訊息</h2><p>從陪伴者頁面按「發送訊息」，聊天紀錄就會出現在這裡。</p><button data-go-msg="search">尋找陪伴者</button></div>';const b=el.querySelector('[data-go-msg]');if(b)b.onclick=()=>go('search');return}
-  el.innerHTML=rows.map(({id,p,chat})=>{const last=chat[chat.length-1],prefix=last.from==='me'?'你：':'',preview=escapeHTML(last.text).replace(/\n/g,' ');return `<div class="conversation" data-chat-id="${id}"><button class="conversationMain"><img src="${p.img}" alt=""><span class="conversationText"><b>${escapeHTML(p.name)}</b><small>${prefix}${preview}</small></span><span class="conversationSide"><time>${last.time||''}</time>${unread[id]?'<i class="unreadDot">1</i>':''}</span></button><button class="conversationDelete" aria-label="刪除聊天室" title="刪除聊天室">刪除</button></div>`}).join('');
-  $$('.conversationMain').forEach(btn=>btn.onclick=()=>openChat(btn.closest('.conversation').dataset.chatId));
-  $$('.conversationDelete').forEach(btn=>btn.onclick=e=>{e.stopPropagation();const id=btn.closest('.conversation').dataset.chatId;if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));setChatUnread(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}})
+  el.innerHTML=rows.map(({id,p,chat,pin})=>{const last=chat[chat.length-1],prefix=last.from==='me'?'你：':'',preview=escapeHTML(last.text).replace(/\n/g,' ');return `<div class="conversationSwipe" data-chat-id="${id}">
+    <div class="swipeAction swipeDelete">刪除</div><div class="swipeAction swipePin">${pin?'取消置頂':'置頂'}</div>
+    <button class="conversationMain swipeCard"><img src="${p.img}" alt=""><span class="conversationText"><b>${pin?'📌 ':''}${escapeHTML(p.name)}</b><small>${prefix}${preview}</small></span><span class="conversationSide"><time>${last.time||''}</time>${unread[id]?'<i class="unreadDot">1</i>':''}</span></button>
+  </div>`}).join('');
+  $$('.conversationSwipe').forEach(row=>attachConversationSwipe(row));
+}
+function attachConversationSwipe(row){
+  const card=row.querySelector('.swipeCard'), id=row.dataset.chatId; let startX=0,startY=0,dx=0,moved=false;
+  card.addEventListener('touchstart',e=>{const t=e.touches[0];startX=t.clientX;startY=t.clientY;dx=0;moved=false;card.style.transition='none'},{passive:true});
+  card.addEventListener('touchmove',e=>{const t=e.touches[0],dy=t.clientY-startY;dx=t.clientX-startX;if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){moved=true;dx=Math.max(-96,Math.min(96,dx));card.style.transform=`translateX(${dx}px)`}},{passive:true});
+  card.addEventListener('touchend',()=>{card.style.transition='transform .22s ease';if(!moved){card.style.transform='';openChat(id);return}
+    if(dx>58){card.style.transform='translateX(96px)';setTimeout(()=>{if(confirm(`要刪除與「${profiles[id].name}」的聊天紀錄嗎？`)){localStorage.removeItem(chatKey(id));setChatUnread(id,false);setPinnedChat(id,false);renderConversations();updateUnreadBadge();toast('聊天紀錄已刪除')}else card.style.transform=''},120)}
+    else if(dx<-58){card.style.transform='translateX(-96px)';setTimeout(()=>{const on=!getPinnedChats().includes(id);setPinnedChat(id,on);renderConversations();toast(on?'已置頂聊天室':'已取消置頂')},120)}
+    else card.style.transform='';
+  });
+  card.addEventListener('click',e=>{if(!moved)openChat(id)});
 }
 
 function escapeHTML(v){return String(v).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}
@@ -113,48 +129,88 @@ const chatIntentRules=[
  ['sleep',/晚安|睡覺|想睡|睏|困了|睡不著|失眠/],
  ['food',/吃飯|吃了嗎|吃什麼|餓|早餐|午餐|晚餐|宵夜|餐廳/],
  ['affection',/我想你|想你了|喜歡你|愛你|抱抱|親親|想見你|想抱/],
- ['love',/失戀|分手|前任|男友|女友|曖昧|劈腿|喜歡他|喜歡她|感情|交往|告白|冷淡|已讀不回/],
- ['angry',/生氣|氣死|很氣|靠北|幹|煩死|討厭|不爽|火大|過分/],
- ['sad',/難過|想哭|哭了|不開心|痛苦|委屈|心情不好|低落|崩潰|撐不住|沒事啦|沒事了/],
+ ['love',/失戀|分手|前任|男友|女友|曖昧|劈腿|感情|交往|告白|冷淡|已讀不回/],
+ ['angry',/生氣|氣死|很氣|煩死|討厭|不爽|火大|過分/],
+ ['sad',/難過|想哭|哭了|不開心|痛苦|委屈|心情不好|低落|崩潰|撐不住/],
  ['tired',/好累|很累|累死|疲憊|沒力|上班|工作|主管|加班|壓力/],
- ['thanks',/謝謝|感謝|謝啦|thank/],
- ['sorry',/對不起|抱歉|sorry/],
+ ['thanks',/謝謝|感謝|謝啦|thank/i],
+ ['sorry',/對不起|抱歉|sorry/i],
  ['hello',/^(嗨|哈囉|哈囉+|hello|hi|在嗎|你好|早安|午安)[!！?？~～。 ]*$/i],
- ['laugh',/哈哈|笑死|笑爛|😂|🤣|www/],
+ ['laugh',/哈哈|笑死|笑爛|😂|🤣|www/i],
  ['question',/[?？]$|為什麼|怎麼|什麼|哪個|是不是|可以嗎|你覺得|你會|你有沒有/]
 ];
-function detectChatIntent(text,history){
+function detectChatIntent(text){
   const t=String(text).trim();
   for(const [intent,re] of chatIntentRules) if(re.test(t)) return intent;
-  // Very short follow-ups inherit the recent topic instead of jumping to a random canned reply.
-  if(t.length<=12){
-    const recent=[...history].reverse().filter(m=>m.from==='me').slice(0,3);
-    for(const m of recent){
-      for(const [intent,re] of chatIntentRules){
-        if(!['hello','laugh','question'].includes(intent)&&re.test(m.text||'')) return intent;
-      }
-    }
-  }
   return 'fallback';
 }
 function pickReply(pool,history){
-  const used=new Set(history.filter(m=>m.from==='them').slice(-6).map(m=>m.text));
+  const used=new Set(history.filter(m=>m.from==='them').slice(-12).map(m=>m.text));
   const fresh=pool.filter(x=>!used.has(x));
   const choices=fresh.length?fresh:pool;
   return choices[Math.floor(Math.random()*choices.length)];
 }
+function recentUser(history){return [...history].reverse().find(m=>m.from==='me')}
+function recentBot(history){return [...history].reverse().find(m=>m.from==='them')}
 function replyFor(id,text){
-  const history=getChat(id), r=chatReplies[id], intent=detectChatIntent(text,history);
-  const lastMine=[...history].reverse().find(m=>m.from==='me'&&m.text!==text);
-  // Follow-up acknowledgements get a contextual bridge rather than an unrelated new topic.
-  if(lastMine && /^(嗯|恩|對|對啊|是啊|好|好吧|不知道|算了|沒事|真的|然後|可是|但是|因為)/.test(text.trim()) && intent==='fallback'){
-    const bridges={
-      wenshu:['嗯，我在聽。接著呢？','好。那前面那件事，妳現在最卡的是哪裡？','我知道。妳不用一次講完，接著說。'],
-      yanyan:['嗯嗯，我有跟上。然後呢？','好，我懂你的意思了。你繼續說。','沒關係，慢慢來，我還在聽。'],
-      sichuan:['嗯，然後？我有跟上。','好啦，繼續。不要講一半。','行，我知道你在接前面那件事。然後咧？']
-    };
-    return pickReply(bridges[id],history);
+  const history=getChat(id), t=String(text).trim(), r=chatReplies[id];
+  const prevUser=recentUser(history.filter(m=>m.text!==text));
+  const prevBot=recentBot(history);
+  const intent=detectChatIntent(t);
+
+  // User is reacting to the character's tone / previous reply.
+  if(/你(的)?態度|態度.*糟|你好兇|你很兇|你很冷淡|你很敷衍|你很機車|你很靠北|你很討厭|不想跟你講|不跟你說了|算了.*不說/.test(t)){
+    const pools={
+      wenshu:['好，是我剛才回得太硬了。妳不是來聽我審問的。重新來，妳剛才說心情不好，我聽。','嗯，我知道。剛才那句不好聽。妳如果還願意說，我換個方式聽。'],
+      yanyan:['啊……抱歉，我剛剛那句真的有點像在敷衍你。你不用整理好再說，我會好好聽。','是我剛才沒接好。對不起。你如果還想說，我在。'],
+      sichuan:['……行，我剛剛那句是欠揍了點。不是不想理你。你心情不好就講，我這次不亂嘴。','嘖，好啦，是我態度差。你要是不爽就罵，但別真的不講。']
+    }; return pickReply(pools[id],history);
   }
+
+  // Direct sadness should never be converted into a generic "continue".
+  if(intent==='sad'){
+    const pools={
+      wenshu:['怎麼了？先不用急著把原因講得很完整。妳現在比較像是委屈、很累，還是單純什麼都不想碰？','好，我在。心情不好就先說心情不好，不用裝沒事。今天發生什麼了？'],
+      yanyan:['嗯……那今天先不用勉強自己看起來沒事。你想從發生的事情開始說，還是先讓我陪你一下？','我有聽到。你現在不舒服的感覺比較像難過、委屈，還是很煩？'],
+      sichuan:['……好，今天先不嘴你。怎麼了？誰惹你，還是你自己悶了一整天？','行。心情不好就講，不用先想好理由。我在聽。']
+    }; return pickReply(pools[id],history);
+  }
+
+  // Very short replies inherit the last user's topic, but only when that topic is clear.
+  if(t.length<=10 && /^(嗯|恩|對|對啊|是啊|好|好吧|不知道|算了|真的|可是|但是|然後|因為|沒有|沒事)$/.test(t) && prevUser){
+    const prevIntent=detectChatIntent(prevUser.text||'');
+    const follow={
+      wenshu:{
+        sad:['不知道原因也沒關係。那就先別逼自己找答案。妳現在想說話，還是想安靜一下？'],
+        angry:['嗯。先把最讓妳不舒服的那一段留下來，其他的等等再處理。'],
+        tired:['那先別硬撐。妳今天已經夠累了。'],
+        fallback:['嗯。我有跟上。妳接著說。']
+      },
+      yanyan:{
+        sad:['不知道也沒關係，有時候情緒就是會先出現。你不用急著解釋。'],
+        angry:['嗯，我懂。你先把想說的說完，我不急著替任何人找理由。'],
+        tired:['那今天真的辛苦了。先讓自己休息一下也可以。'],
+        fallback:['嗯嗯，我有跟上。你慢慢說。']
+      },
+      sichuan:{
+        sad:['不知道就不知道，幹嘛逼自己現在想出答案。先待著。'],
+        angry:['嗯，這樣聽起來確實很煩。你繼續，我先不插嘴。'],
+        tired:['那就休息。你又不是非得今天把全世界處理完。'],
+        fallback:['嗯，有在聽。你講。']
+      }
+    };
+    return pickReply((follow[id]&&follow[id][prevIntent])||follow[id].fallback,history);
+  }
+
+  // If user asks "什麼？" after a confusing bot message, clarify instead of changing topic.
+  if(/^(什麼|蛤|蛤？|什麼意思|你在說什麼)[?？ ]*$/.test(t) && prevBot){
+    const pools={
+      wenshu:['我是說，我剛才可能沒接到妳真正想講的。妳照自己的方式說就好。'],
+      yanyan:['我的意思是我剛剛可能理解錯了😅 你照原本想說的繼續就好。'],
+      sichuan:['我是說我剛剛沒接懂。算我的，你重講，我不瞎猜。']
+    }; return pickReply(pools[id],history);
+  }
+
   return pickReply(r[intent]||r.fallback,history);
 }
 function chatKey(id){return 'side-chat-'+id}
@@ -192,13 +248,24 @@ $('#bookingForm').onsubmit=e=>{
   records.unshift({id:bookingProfileId,date,time,plan,createdAt:new Date().toISOString()});
   localStorage.setItem('side-bookings',JSON.stringify(records)); closeBooking(); toast('預約已加入紀錄 ♡');
 };
+function deleteBookingRecord(index){
+  const records=JSON.parse(localStorage.getItem('side-bookings')||'[]');
+  if(!records[index])return;
+  if(confirm('確定要刪除這筆預約紀錄嗎？')){
+    records.splice(index,1);localStorage.setItem('side-bookings',JSON.stringify(records));renderRecords();toast('預約紀錄已刪除');
+  }
+}
 function renderRecords(){
   const records=JSON.parse(localStorage.getItem('side-bookings')||'[]');
   const el=$('#recordList'); if(!el)return;
   if(!records.length){el.innerHTML='<div class="recordEmpty"><div>♡</div><h2>目前沒有預約紀錄</h2><p>完成預約後，紀錄會顯示在這裡。</p><button onclick="go(\'search\')">瀏覽陪伴者</button></div>';return}
-  el.innerHTML=records.map(r=>{const p=profiles[r.id];return `<article class="recordCard"><small>BOOKING CONFIRMED</small><h2>${p?p.name:r.id}</h2><div class="recordMeta"><span>日期　${r.date}</span><span>時間　${r.time}</span><span>方案　${r.plan}</span><span>狀態　預約成立</span></div></article>`}).join('');
+  el.innerHTML=records.map((r,i)=>{const p=profiles[r.id];return `<article class="recordCard"><div class="recordTop"><small>BOOKING CONFIRMED</small><button class="recordDelete" data-record-index="${i}" aria-label="刪除預約紀錄">刪除</button></div><h2>${p?p.name:r.id}</h2><div class="recordMeta"><span>日期　${r.date}</span><span>時間　${r.time}</span><span>方案　${r.plan}</span><span>狀態　預約成立</span></div></article>`}).join('');
+  $$('.recordDelete').forEach(b=>b.onclick=()=>deleteBookingRecord(Number(b.dataset.recordIndex)));
 }
+
 
 $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}}); $('#chatModal').onclick=e=>{if(e.target===$('#chatModal'))closeChat()};
 
 // SIDE v10 contextual chat build
+
+// SIDE v11: conservative contextual chat, swipe delete/pin, deletable booking records
