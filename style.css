@@ -101,3 +101,8 @@ nav button[data-go="messages"]{position:relative}
 
 /* v19: normal chat has no choice chips */
 .quickReplies{display:none!important}
+
+/* SIDE v20 — no quick-reply chips anywhere. Booking CTA is the only chat button. */
+.quickReplies,.rootQuick{display:none!important}
+.chatWelcome .quickReplies{display:none!important}
+.chatAction[data-action="booking"]{display:block!important}

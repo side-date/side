@@ -279,7 +279,7 @@ function closeChat(){clearTimeout(typingTimer);$('#chatTyping').classList.remove
 function renderChat(){
  if(!chatProfileId)return;
  const a=getChat(chatProfileId),box=$('#chatMessages');
- box.innerHTML=a.length?a.map((m,i)=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}${m.action?`<button class="chatAction" data-action="${m.action}">${escapeHTML(m.label||'前往預約')}</button>`:''}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。</div>`;
+ box.innerHTML=a.length?a.map((m,i)=>`<div class="bubbleRow ${m.from==='me'?'mine':'theirs'}"><div class="bubble">${escapeHTML(m.text).replace(/\\n|\n/g,'<br>')}${m.action==='booking'?`<button class="chatAction" data-action="booking">${escapeHTML(m.label||'前往預約')}</button>`:''}<small>${m.time||''}</small></div></div>`).join(''):`<div class="chatWelcome">你已經和 ${escapeHTML(profiles[chatProfileId].name)} 開始對話。</div>`;
  $$('.chatAction',box).forEach(b=>b.onclick=()=>{if(b.dataset.action==='booking'){const id=chatProfileId;closeChat();setTimeout(()=>openBooking(id),180)}});
  box.scrollTop=box.scrollHeight;
 }
@@ -358,3 +358,5 @@ $('#chatClose').onclick=closeChat; $('#chatSend').onclick=sendChat; $('#chatInpu
 // SIDE BUILD v18 topic-aware free text + guaranteed booking CTA
 
 // SIDE BUILD v19: plain-text chat; booking is the only CTA
+
+// SIDE BUILD v20: normal chat has zero quick replies; booking CTA only
